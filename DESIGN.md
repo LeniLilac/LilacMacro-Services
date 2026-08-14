@@ -1,0 +1,29 @@
+# Design
+
+## Direction
+
+The site and admin console extend LilacMacro's SquareClaim-inspired paper-and-ink language: tactile outlined controls, hard offset shadows, compact system typography, bright lilac accents, and restrained semantic color. They must not become a neon gamer dashboard, glass UI, generic SaaS landing page, or decorative operations console.
+
+## Public site
+
+- Lead with the product name, one-sentence purpose, direct GitHub Release download, and current operational state.
+- Use short sections for capabilities, setup, privacy, open-source status, and links. Avoid marketing superlatives, fake metrics, testimonials, and oversized gradients.
+- Download links point directly to the verified GitHub Release asset.
+- Status and maintenance content remains readable without JavaScript.
+
+## Admin console
+
+- Familiar top navigation: Overview, Codes, Schedules, Features, Diagnostics, Audit.
+- Dense desktop-first tables and forms with responsive stacking on narrow screens.
+- Every action exposes its current value, effective time, actor, and audit result.
+- Confirmation dialogs name the exact effect. Destructive and safety-impacting operations cannot share primary-action styling.
+- Loading uses shaped skeletons; empty states explain the next legitimate action in one sentence.
+
+## Visual system
+
+- System UI typeface; compact fixed scale.
+- Paper canvas, bounded cards only where grouping earns them, black ink outlines, hard 3-pixel offset shadows.
+- Lilac is the primary action/selection color. Red is destructive/error only; green is verified success; amber is warning/maintenance.
+- Controls implement default, hover, focus-visible, active, disabled, loading, and error states.
+- Motion is 150-220 ms and communicates state only.
+- Maintain WCAG AA text contrast, keyboard navigation, clear focus, reduced-motion support, and text-backed status.

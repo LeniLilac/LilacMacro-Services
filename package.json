@@ -1,0 +1,52 @@
+{
+  "name": "lilacmacro-services",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.18.1 <25"
+  },
+  "scripts": {
+    "build": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && node scripts/copy-static.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "policy": "node scripts/check-policy.mjs",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "check": "npm run format:check && npm run policy && npm run typecheck && npm run build",
+    "test": "node --import tsx --test --test-concurrency=8 test/**/*.test.ts",
+    "test:coverage": "c8 --all --src src --extension .ts --exclude 'src/apps/api.ts' --exclude 'src/apps/bot.ts' --exclude 'src/apps/control.ts' --exclude 'src/apps/worker.ts' --check-coverage --lines 80 --functions 80 --branches 75 --statements 80 npm test",
+    "verify:container": "node scripts/verify-container.mjs",
+    "verify:backblaze": "node dist/scripts/verify-backblaze-provider.js",
+    "provision:backblaze-keys": "node dist/scripts/provision-backblaze-keys.js",
+    "configure:cloudflare": "node dist/scripts/configure-cloudflare.js",
+    "start:api": "node dist/src/apps/api.js",
+    "start:bot": "node dist/src/apps/bot.js",
+    "start:control": "node dist/src/apps/control.js",
+    "start:worker": "node dist/src/apps/worker.js",
+    "dev:api": "tsx watch src/apps/api.ts",
+    "migrate": "tsx scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
+    "@aws-sdk/s3-request-presigner": "^3.1075.0",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/formbody": "^8.0.2",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/static": "^10.1.3",
+    "discord.js": "^14.27.0",
+    "fastify": "^5.7.4",
+    "jose": "^6.1.3",
+    "pg": "^8.22.0",
+    "pino": "^10.3.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.4",
+    "@types/pg": "^8.20.0",
+    "c8": "^11.0.0",
+    "prettier": "^3.8.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  }
+}

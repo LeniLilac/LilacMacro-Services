@@ -1,0 +1,70 @@
+name: quality
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.11-bookworm@sha256:84560e3b9c6874893fc4e2854f5dc3e7c1a37bc9d1dfd7a8c641310ae22ba5ad
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24.18.1
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run static and build checks
+        run: npm run check
+
+      - name: Run tests with coverage
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/postgres
+        run: npm run test:coverage
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Build container image
+        run: docker build --tag lilacmacro-services:${{ github.sha }} .
+
+      - name: Verify built container and rendered authority boundaries
+        run: npm run verify:container -- lilacmacro-services:${{ github.sha }}
+
+      - name: Rehearse staging migrations, readiness, and rollback
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          PROJECT_NAME: lilacmacro-services-ci-${{ github.run_id }}
+        run: bash ops/verify-staging.sh

@@ -1,0 +1,260 @@
+x-runtime: &runtime
+  build:
+    context: .
+  image: lilacmacro-services:${RELEASE_SHA:-local}
+  restart: unless-stopped
+  init: true
+  user: '1000:1000'
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 128
+  mem_limit: 512m
+  cpus: 1.0
+  stop_grace_period: 30s
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000,mode=0700
+  environment: &runtime-environment
+    NODE_ENV: production
+    HOST: 0.0.0.0
+    PORT: 3100
+    PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN is required}
+    CONTROL_SIGNING_PUBLIC_KEY_BASE64: ${CONTROL_SIGNING_PUBLIC_KEY_BASE64:?CONTROL_SIGNING_PUBLIC_KEY_BASE64 is required}
+    CONTROL_SIGNING_KEY_ID: ${CONTROL_SIGNING_KEY_ID:-primary-1}
+  networks:
+    - backend
+  logging: &bounded-logs
+    driver: json-file
+    options:
+      max-size: 25m
+      max-file: '5'
+      compress: 'true'
+
+services:
+  api:
+    <<: *runtime
+    command: ['node', 'dist/src/apps/api.js']
+    environment:
+      <<: *runtime-environment
+      DATABASE_URL: postgresql://lilacmacro_api:${POSTGRES_API_PASSWORD:?POSTGRES_API_PASSWORD is required}@postgres:5432/lilacmacro
+      BACKBLAZE_BUCKET_NAME: ${BACKBLAZEBUCKETNAME:?BACKBLAZEBUCKETNAME is required}
+      BACKBLAZE_S3_ENDPOINT: ${BACKBLAZES3ENDPOINT:?BACKBLAZES3ENDPOINT is required}
+      BACKBLAZE_REGION: ${BACKBLAZEREGION:?BACKBLAZEREGION is required}
+      BACKBLAZE_KEY_ID: ${BACKBLAZE_API_KEY_ID:?BACKBLAZE_API_KEY_ID is required}
+      BACKBLAZE_APPLICATION_KEY: ${BACKBLAZE_API_APPLICATION_KEY:?BACKBLAZE_API_APPLICATION_KEY is required}
+      BACKBLAZE_KEY_PREFIX: ${BACKBLAZE_KEY_PREFIX:?BACKBLAZE_KEY_PREFIX is required}
+      INTERNAL_CONTROL_ORIGIN: http://control:3101
+      INTERNAL_API_TOKEN_BASE64: ${INTERNAL_API_TOKEN_BASE64:?INTERNAL_API_TOKEN_BASE64 is required}
+      INTERNAL_BOT_TOKEN_BASE64: ${INTERNAL_BOT_TOKEN_BASE64:?INTERNAL_BOT_TOKEN_BASE64 is required}
+      DISCORD_BOT_CLIENT_ID: ${DISCORD_BOT_CLIENT_ID:?DISCORD_BOT_CLIENT_ID is required}
+      DISCORD_BOT_CLIENT_SECRET: ${DISCORD_BOT_CLIENT_SECRET:?DISCORD_BOT_CLIENT_SECRET is required}
+      DISCORD_OAUTH_REDIRECT_URI: ${DISCORD_OAUTH_REDIRECT_URI:?DISCORD_OAUTH_REDIRECT_URI is required}
+      MACRO_ADMIN_IDS: ${MACRO_ADMIN_IDS:?MACRO_ADMIN_IDS is required}
+      SESSION_CSRF_HMAC_KEY_BASE64: ${SESSION_CSRF_HMAC_KEY_BASE64:?SESSION_CSRF_HMAC_KEY_BASE64 is required}
+      OAUTH_STATE_ENCRYPTION_KEY_BASE64: ${OAUTH_STATE_ENCRYPTION_KEY_BASE64:?OAUTH_STATE_ENCRYPTION_KEY_BASE64 is required}
+      UPLOAD_AUTH_HMAC_KEY_BASE64: ${UPLOAD_AUTH_HMAC_KEY_BASE64:?UPLOAD_AUTH_HMAC_KEY_BASE64 is required}
+      LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64: ${LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64:?LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64 is required}
+      INSTALL_PSEUDONYM_HMAC_KEY_BASE64: ${INSTALL_PSEUDONYM_HMAC_KEY_BASE64:?INSTALL_PSEUDONYM_HMAC_KEY_BASE64 is required}
+      NETWORK_PSEUDONYM_HMAC_KEY_BASE64: ${NETWORK_PSEUDONYM_HMAC_KEY_BASE64:?NETWORK_PSEUDONYM_HMAC_KEY_BASE64 is required}
+      TRUSTED_PROXY_CIDRS: ${EDGE_PROXY_ADDRESS:-10.250.254.3}/32
+    depends_on:
+      control:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:${API_PUBLISH_PORT:-13110}:3100'
+    networks:
+      backend:
+      egress:
+      edge:
+        ipv4_address: ${EDGE_API_ADDRESS:-10.250.254.2}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3100/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 20s
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.8.2@sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38
+    restart: unless-stopped
+    init: true
+    user: '65532:65532'
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.5
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,uid=65532,gid=65532,mode=0700
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}
+      TUNNEL_METRICS: 0.0.0.0:2000
+      TUNNEL_LOGLEVEL: info
+    command: ['tunnel', 'run']
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      edge:
+        ipv4_address: ${EDGE_PROXY_ADDRESS:-10.250.254.3}
+    healthcheck:
+      test: ['CMD', 'cloudflared', 'tunnel', '--metrics', '127.0.0.1:2000', 'ready']
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    logging: *bounded-logs
+
+  control:
+    <<: *runtime
+    command: ['node', 'dist/src/apps/control.js']
+    environment:
+      <<: *runtime-environment
+      PORT: 3101
+      DATABASE_URL: postgresql://lilacmacro_control:${POSTGRES_CONTROL_PASSWORD:?POSTGRES_CONTROL_PASSWORD is required}@postgres:5432/lilacmacro
+      CONTROL_SIGNING_PRIVATE_KEY_BASE64: ${CONTROL_SIGNING_PRIVATE_KEY_BASE64:?CONTROL_SIGNING_PRIVATE_KEY_BASE64 is required}
+      INTERNAL_API_TOKEN_BASE64: ${INTERNAL_API_TOKEN_BASE64:?INTERNAL_API_TOKEN_BASE64 is required}
+      INTERNAL_BOT_TOKEN_BASE64: ${INTERNAL_BOT_TOKEN_BASE64:?INTERNAL_BOT_TOKEN_BASE64 is required}
+      INTERNAL_WORKER_TOKEN_BASE64: ${INTERNAL_WORKER_TOKEN_BASE64:?INTERNAL_WORKER_TOKEN_BASE64 is required}
+      MACRO_ADMIN_IDS: ${MACRO_ADMIN_IDS:?MACRO_ADMIN_IDS is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3101/health/ready').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 20s
+
+  bot:
+    <<: *runtime
+    command: ['node', 'dist/src/apps/bot.js']
+    environment:
+      <<: *runtime-environment
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:?DISCORD_BOT_TOKEN is required}
+      DISCORD_BOT_CLIENT_ID: ${DISCORD_BOT_CLIENT_ID:?DISCORD_BOT_CLIENT_ID is required}
+      MACRO_ADMIN_IDS: ${MACRO_ADMIN_IDS:?MACRO_ADMIN_IDS is required}
+      INTERNAL_API_ORIGIN: http://api:3100
+      INTERNAL_CONTROL_ORIGIN: http://control:3101
+      INTERNAL_BOT_TOKEN_BASE64: ${INTERNAL_BOT_TOKEN_BASE64:?INTERNAL_BOT_TOKEN_BASE64 is required}
+    depends_on:
+      api:
+        condition: service_healthy
+      control:
+        condition: service_healthy
+    networks:
+      - backend
+      - egress
+    healthcheck:
+      test: ['CMD', 'node', 'scripts/check-heartbeat.mjs', '/tmp/lilacmacro-bot-ready', '45000']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    <<: *runtime
+    command: ['node', 'dist/src/apps/worker.js']
+    environment:
+      <<: *runtime-environment
+      DATABASE_URL: postgresql://lilacmacro_worker:${POSTGRES_WORKER_PASSWORD:?POSTGRES_WORKER_PASSWORD is required}@postgres:5432/lilacmacro
+      BACKBLAZE_BUCKET_NAME: ${BACKBLAZEBUCKETNAME:?BACKBLAZEBUCKETNAME is required}
+      BACKBLAZE_S3_ENDPOINT: ${BACKBLAZES3ENDPOINT:?BACKBLAZES3ENDPOINT is required}
+      BACKBLAZE_REGION: ${BACKBLAZEREGION:?BACKBLAZEREGION is required}
+      BACKBLAZE_KEY_ID: ${BACKBLAZE_WORKER_KEY_ID:?BACKBLAZE_WORKER_KEY_ID is required}
+      BACKBLAZE_APPLICATION_KEY: ${BACKBLAZE_WORKER_APPLICATION_KEY:?BACKBLAZE_WORKER_APPLICATION_KEY is required}
+      BACKBLAZE_KEY_PREFIX: ${BACKBLAZE_KEY_PREFIX:?BACKBLAZE_KEY_PREFIX is required}
+      INTERNAL_CONTROL_ORIGIN: http://control:3101
+      INTERNAL_WORKER_TOKEN_BASE64: ${INTERNAL_WORKER_TOKEN_BASE64:?INTERNAL_WORKER_TOKEN_BASE64 is required}
+      GITHUB_RELEASE_REPOSITORY: LeniLilac/LilacMacro
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      ROBLOX_UNIVERSE_ID: ${ROBLOX_UNIVERSE_ID:-}
+    depends_on:
+      control:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+      - egress
+    healthcheck:
+      test: ['CMD', 'node', 'scripts/check-heartbeat.mjs', '/tmp/lilacmacro-worker-ready', '45000']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+  migrator:
+    <<: *runtime
+    profiles: ['tools']
+    restart: 'no'
+    command: ['node', '-e', 'process.exit(0)']
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://lilacmacro:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/lilacmacro
+      POSTGRES_API_PASSWORD: ${POSTGRES_API_PASSWORD:?POSTGRES_API_PASSWORD is required}
+      POSTGRES_CONTROL_PASSWORD: ${POSTGRES_CONTROL_PASSWORD:?POSTGRES_CONTROL_PASSWORD is required}
+      POSTGRES_WORKER_PASSWORD: ${POSTGRES_WORKER_PASSWORD:?POSTGRES_WORKER_PASSWORD is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17.11-bookworm@sha256:84560e3b9c6874893fc4e2854f5dc3e7c1a37bc9d1dfd7a8c641310ae22ba5ad
+    restart: unless-stopped
+    shm_size: 256m
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_USER: lilacmacro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: lilacmacro
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lilacmacro -d lilacmacro']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *bounded-logs
+
+volumes:
+  postgres_data:
+
+networks:
+  backend:
+    name: ${COMPOSE_PROJECT_NAME:-lilacmacro-services}_backend
+    internal: true
+  egress:
+    name: ${COMPOSE_PROJECT_NAME:-lilacmacro-services}_egress
+    internal: false
+  edge:
+    name: ${COMPOSE_PROJECT_NAME:-lilacmacro-services}_edge
+    internal: false
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-10.250.254.0/29}

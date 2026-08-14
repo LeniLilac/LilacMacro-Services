@@ -1,0 +1,70 @@
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [quality]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') }}
+    runs-on: [self-hosted, Linux, X64, vps, lilacmacro-services, deploy]
+    timeout-minutes: 30
+    concurrency:
+      group: lilacmacro-services-production
+      cancel-in-progress: false
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Check out verified commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify exact current main commit
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "${RELEASE_SHA}" ]]
+          [[ "$(git ls-remote --exit-code origin refs/heads/main | awk '{print $1}')" == "${RELEASE_SHA}" ]]
+
+      - name: Stage release
+        run: |
+          set -euo pipefail
+          root=/opt/lilacmacro-services.__incoming
+          incoming="${root}/${RELEASE_SHA}"
+          [[ -d "${root}" && ! -L "${root}" ]]
+          mkdir -p -- "${incoming}"
+          find "${incoming}" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+          rsync -a .dockerignore Dockerfile compose.yml migrations ops package.json package-lock.json public scripts src tsconfig.json tsconfig.build.json "${incoming}/"
+
+      - name: Apply health-gated release
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          set -euo pipefail
+          APP_DIR=/opt/lilacmacro-services \
+          INCOMING_DIR="/opt/lilacmacro-services.__incoming/${RELEASE_SHA}" \
+          RELEASE_SHA="${RELEASE_SHA}" \
+          PROJECT_NAME=lilacmacro-services \
+          bash "/opt/lilacmacro-services.__incoming/${RELEASE_SHA}/ops/apply-release.sh"
+
+      - name: Remove staged release
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          incoming="/opt/lilacmacro-services.__incoming/${RELEASE_SHA}"
+          [[ ! -L "${incoming}" ]]
+          if [[ -d "${incoming}" ]]; then
+            find "${incoming}" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+            rmdir -- "${incoming}"
+          fi

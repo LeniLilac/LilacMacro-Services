@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="LilacMacro is a free, inspectable Windows macro for Anime Expeditions automation and dataset-backed diagnostics."
+    />
+    <title>LilacMacro — reliable runs, visible decisions</title>
+    <link rel="stylesheet" href="/assets/site.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="brand" href="/" aria-label="LilacMacro home"
+        ><span class="brand-mark">L</span>LilacMacro</a
+      >
+      <nav aria-label="Main navigation">
+        <a href="#features">Features</a>
+        <a href="#safety">Safety</a>
+        <a href="https://github.com/LeniLilac/LilacMacro">Source</a>
+      </nav>
+      <a class="button small" href="https://github.com/LeniLilac/LilacMacro/releases/latest"
+        >Download</a
+      >
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="eyebrow">FREE WINDOWS AUTOMATION · PUBLIC SOURCE</div>
+        <h1>Long runs without<br /><span>blind automation.</span></h1>
+        <p>
+          LilacMacro watches the screen, verifies the state it owns, and uses ordinary Windows
+          input. Build plans, author placements, run multiple local sessions, and keep the reasoning
+          visible.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="https://github.com/LeniLilac/LilacMacro/releases/latest"
+            >Get LilacMacro</a
+          >
+          <a class="button" href="https://github.com/LeniLilac/LilacMacro">Inspect the code</a>
+        </div>
+        <div class="status-strip" role="status">
+          <span class="status-dot"></span>
+          <strong>Public control status</strong>
+          <span id="game-status">Checking…</span>
+        </div>
+      </section>
+
+      <section class="feature-grid" id="features">
+        <article class="feature-card feature-wide">
+          <span class="card-index">01</span>
+          <h2>Plan once. Observe every transition.</h2>
+          <p>
+            Story, Raid, Challenge, Event, Expedition, utilities, placement authoring, and recovery
+            share one evidence-bounded runtime.
+          </p>
+          <div class="mini-window" aria-hidden="true">
+            <div class="mini-bar"><i></i><i></i><i></i></div>
+            <div class="mini-row active">
+              <b>1</b><span>Raid · Spirit City · Act 3</span><em>READY</em>
+            </div>
+            <div class="mini-row"><b>2</b><span>Gold shop reset</span><em>DAILY</em></div>
+            <div class="mini-row">
+              <b>3</b><span>Expedition · School Grounds</span><em>OPTIMIZE</em>
+            </div>
+          </div>
+        </article>
+        <article class="feature-card">
+          <span class="card-index">02</span>
+          <h2>Dataset-backed</h2>
+          <p>
+            Capture, annotate, compare, and deep-debug the exact frames behind a detector decision.
+          </p>
+        </article>
+        <article class="feature-card ink">
+          <span class="card-index">03</span>
+          <h2>Multiple accounts</h2>
+          <p>
+            Manage isolated Windows sessions with their own Roblox login and macro UI from one
+            machine.
+          </p>
+        </article>
+        <article class="feature-card">
+          <span class="card-index">04</span>
+          <h2>Recovery-first</h2>
+          <p>
+            Re-check missed transitions, expand temporal search, restart Roblox, and skip unhealthy
+            tasks before giving up.
+          </p>
+        </article>
+      </section>
+
+      <section class="safety" id="safety">
+        <div>
+          <div class="eyebrow">THE HARD BOUNDARY</div>
+          <h2>Screen capture in.<br />Windows input out.</h2>
+        </div>
+        <ul>
+          <li>No Roblox injection or memory inspection</li>
+          <li>No hooks, anti-cheat bypasses, or hidden commands</li>
+          <li>Fresh evidence before owned input</li>
+          <li>Opt-in, expiring diagnostic uploads</li>
+          <li>Signed public safety status with local last-known-good fallback</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer>
+      <span>LilacMacro is a free passion project.</span>
+      <a href="/privacy">Privacy</a>
+      <a href="https://github.com/LeniLilac/LilacMacro/releases/latest">Releases</a>
+    </footer>
+    <script src="/assets/site.js" defer></script>
+  </body>
+</html>
