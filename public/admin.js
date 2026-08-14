@@ -152,6 +152,38 @@ async function loadDiagnostics() {
   if (!rows.length) renderEmptyRow('#diagnostic-rows', 6, 'No diagnostic uploads.');
 }
 
+async function issueLargeUploadGrant(formElement) {
+  const form = new FormData(formElement);
+  const result = await request('/admin/api/diagnostics/large-upload-grants', {
+    method: 'POST',
+    body: JSON.stringify({
+      installId: form.get('installId'),
+      sizeBytes: Number(form.get('sizeBytes')),
+      kind: form.get('kind'),
+    }),
+  });
+  const output = document.querySelector('#large-upload-result');
+  document.querySelector('#large-upload-grant').value = result.grant;
+  document.querySelector('#large-upload-expiry').textContent =
+    `Expires ${formatDate(result.expiresAt)}`;
+  output.hidden = false;
+  formElement.reset();
+  await loadAudit();
+  notice('Large-file grant issued. Send it only to the user who supplied this installation ID.');
+}
+
+async function copyLargeUploadGrant() {
+  const grant = document.querySelector('#large-upload-grant').value;
+  if (!grant) return;
+  try {
+    await navigator.clipboard.writeText(grant);
+    notice('Large-file grant copied.');
+  } catch {
+    document.querySelector('#large-upload-grant').select();
+    notice('Clipboard access was unavailable. The grant is selected for manual copying.', true);
+  }
+}
+
 function diagnosticActions(record) {
   const node = document.createElement('td');
   node.className = 'row-actions';
@@ -362,6 +394,11 @@ document.querySelector('#schedule-form [name="key"]').onchange = (event) => {
 };
 document.querySelector('#refresh-diagnostics').onclick = () =>
   void loadDiagnostics().catch((error) => notice(error.message, true));
+document.querySelector('#large-upload-form').onsubmit = (event) => {
+  event.preventDefault();
+  void issueLargeUploadGrant(event.currentTarget).catch((error) => notice(error.message, true));
+};
+document.querySelector('#copy-large-upload-grant').onclick = () => void copyLargeUploadGrant();
 document.querySelector('#refresh-audit').onclick = () =>
   void loadAudit().catch((error) => notice(error.message, true));
 document.querySelector('#logout').onclick = async () => {

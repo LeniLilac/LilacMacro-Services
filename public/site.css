@@ -346,6 +346,52 @@ footer span {
 .admin-body {
   background-color: #f1ecf0;
 }
+.setup {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(36px, 7vw, 110px);
+  padding: 72px clamp(18px, 5vw, 76px);
+  border-top: 2px solid var(--ink);
+  background: var(--paper-2);
+}
+.setup h2 {
+  max-width: 16ch;
+  margin: 12px 0 18px;
+  font-size: clamp(34px, 4vw, 58px);
+  line-height: 0.98;
+}
+.setup p {
+  max-width: 60ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.setup ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: setup-step;
+  border-top: 2px solid var(--ink);
+}
+.setup li {
+  display: grid;
+  grid-template-columns: 44px 160px 1fr;
+  gap: 16px;
+  align-items: baseline;
+  padding: 20px 0;
+  counter-increment: setup-step;
+  border-bottom: 1px solid #bbaab3;
+}
+.setup li::before {
+  content: counter(setup-step, decimal-leading-zero);
+  font:
+    12px ui-monospace,
+    monospace;
+  color: var(--accent-dark);
+}
+.setup li span {
+  color: var(--muted);
+  line-height: 1.5;
+}
 .admin-shell {
   padding: 48px clamp(18px, 5vw, 76px);
 }
@@ -444,6 +490,46 @@ select {
 .schedule-form {
   grid-template-columns: 1fr 1fr 220px auto;
   align-items: end;
+}
+.large-upload-form {
+  grid-template-columns: 1.1fr 1fr 180px auto;
+  align-items: end;
+  margin-bottom: 20px;
+  padding: 18px;
+  background: var(--paper-2);
+  border: 1px solid #bbaab3;
+}
+.grant-result {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px 14px;
+  align-items: end;
+  margin-bottom: 20px;
+  padding: 18px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+}
+.grant-result[hidden] {
+  display: none;
+}
+.grant-result > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  grid-column: 1 / -1;
+  font-size: 12px;
+}
+.grant-result textarea {
+  min-width: 0;
+  padding: 10px 12px;
+  resize: vertical;
+  border: 2px solid var(--ink);
+  background: #fff;
+  color: var(--ink);
+  font:
+    12px ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
 }
 .item-list {
   display: grid;
@@ -566,6 +652,15 @@ dialog::backdrop {
     grid-template-columns: 1fr;
     gap: 40px;
   }
+  .setup {
+    grid-template-columns: 1fr;
+  }
+  .setup li {
+    grid-template-columns: 38px 1fr;
+  }
+  .setup li span {
+    grid-column: 2;
+  }
   .admin-grid {
     grid-template-columns: 1fr;
   }
@@ -583,7 +678,11 @@ dialog::backdrop {
     grid-template-columns: 1fr;
   }
   .stack-form,
-  .schedule-form {
+  .schedule-form,
+  .large-upload-form {
+    grid-template-columns: 1fr;
+  }
+  .grant-result {
     grid-template-columns: 1fr;
   }
   .admin-heading {

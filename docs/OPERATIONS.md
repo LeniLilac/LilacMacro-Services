@@ -57,6 +57,13 @@ The worker runs every minute and:
 6. lists incomplete multipart uploads under the exact service prefix and aborts provider uploads older than 12 hours that are absent from repository state;
 7. enforces the configured storage-time budget and per-install/IP quotas.
 
+For an archive over 3 GiB, the user copies the random Installation ID shown in LilacMacro Settings
+and supplies that ID plus the archive's exact byte size and kind to an administrator. The
+administrator uses **Diagnostics > Issue 30-minute grant** in the control desk, copies the returned
+grant once, and sends it back to that user. The user pastes it into LilacMacro's Large File Grant
+field before explicitly selecting the archive. The grant is attributable, tuple-bound, and consumed
+once; neither side should post it in a public channel or diagnostic record.
+
 Deletion is idempotent. A failed provider deletion remains queued and is retried with bounded backoff; stale `Deleting` leases are reclaimed after 15 minutes, metadata is not reported deleted until storage confirms that every exact-key version and delete marker is absent, and Expired metadata continues to consume the global retained-byte budget until that confirmation. Provider control requests use explicit deadlines, full-object verification has a size-bounded deadline, and worker shutdown cancels active work and schedules a bounded retry before the container grace period ends. Multipart reconciliation continues through the complete claimed page even when one abort fails. The provisioned one-day Backblaze noncurrent-version and incomplete-multipart lifecycle rule is defense in depth and does not replace application reconciliation.
 
 After inspecting an accepted archive, an administrator should use Delete from the control desk or `/macro-diagnostic action:Delete`. This records the actor, claims the archive with a compare-and-swap status transition, and uses the same provider-confirmed deletion and retry path as automated expiry. Routine retained storage is capped globally at 900 GiB so even a continuously full allocation remains under the accepted monthly TB-hour budget.

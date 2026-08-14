@@ -136,6 +136,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     const landing = await app.inject({ method: 'GET', url: '/' });
     assert.equal(landing.statusCode, 200);
     assert.match(landing.headers['cache-control'] ?? '', /max-age=300/);
+    assert.match(landing.body, /id="setup"/);
     const health = await app.inject({ method: 'GET', url: '/health/live' });
     assert.equal(health.statusCode, 200);
     assert.equal(health.headers['cache-control'], 'no-store');
@@ -157,6 +158,11 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(adminPage.statusCode, 200);
     assert.equal(adminPage.headers['cache-control'], 'no-store');
     assert.doesNotMatch(adminPage.body, /__CSRF_TOKEN__/);
+    assert.match(adminPage.body, /id="large-upload-form"/);
+    assert.match(adminPage.body, /method="post"/);
+    assert.match(adminPage.body, /action="\/admin\/api\/diagnostics\/large-upload-grants"/);
+    assert.match(adminPage.body, /autocomplete="off"/);
+    assert.match(adminPage.body, /Exact archive size \(bytes\)/);
 
     const command = {
       commandId: randomUUID(),
