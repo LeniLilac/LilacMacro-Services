@@ -18,7 +18,7 @@ The existing VPS host and unprivileged deploy identity are recorded only in `.lo
 - `/health/live` proves the process is alive.
 - `/health/ready` verifies database connectivity and signing/public-key consistency without contacting optional vendors.
 - `cloudflared tunnel ready` verifies an established edge connection, and the deployment gate then reaches `/health/ready` through the canonical HTTPS origin.
-- Deployment stages an exact Git commit, builds images, runs migrations under a lock, starts the candidate, waits for readiness, then prunes the prior release only after success.
+- Deployment stages an exact Git commit, builds its immutable application image once for reuse by every Node role, runs migrations under a lock, starts the candidate, waits for readiness, then prunes the prior release only after success.
 - A failed readiness check restores the previous source/image/database-compatible process set.
 
 ## Proxy and cache behavior

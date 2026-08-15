@@ -56,6 +56,15 @@ for (const name of ['api', 'control', 'bot', 'worker', 'migrator', 'postgres', '
   if (!services?.[name]) throw new Error(`Rendered Compose omitted ${name}.`);
 }
 
+for (const name of ['api', 'control', 'bot', 'worker', 'migrator']) {
+  if (services[name].image !== 'lilacmacro-services:container-check') {
+    throw new Error(`${name} did not reuse the one immutable application image.`);
+  }
+  if (services[name].build) {
+    throw new Error(`${name} unexpectedly defined a per-service image build.`);
+  }
+}
+
 const environmentOf = (name) => services[name].environment ?? {};
 const mustHave = (name, key) => {
   if (!environmentOf(name)[key]) throw new Error(`${name} omitted ${key}.`);

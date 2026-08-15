@@ -16,10 +16,13 @@ npm run check
 npm test
 npm run test:coverage
 npm audit --audit-level=high
-docker compose up --build
+docker build --tag lilacmacro-services:local .
+RELEASE_SHA=local docker compose up
 ```
 
 `npm run check` validates formatting conventions, repository policy, type safety, and production builds. Tests use isolated temporary data and never require real Discord, GitHub, Backblaze, Doppler, Roblox, or VPS access.
+
+The API, control service, bot, worker, and one-shot migrator reuse the same application image. Build that image once per source revision; do not add per-service Compose builds because parallel exporters targeting the same immutable tag are nondeterministic.
 
 ## Local configuration
 

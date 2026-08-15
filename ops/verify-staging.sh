@@ -103,7 +103,7 @@ EOF
 
 "${compose[@]}" config --quiet
 if ! docker image inspect "lilacmacro-services:${release_sha}" >/dev/null 2>&1; then
-  "${compose[@]}" build --pull
+  docker build --pull --tag "lilacmacro-services:${release_sha}" .
 fi
 "${compose[@]}" up -d postgres
 

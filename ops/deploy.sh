@@ -24,7 +24,7 @@ doppler run -- bash -c '
   exit 1
 }
 doppler run -- "${compose[@]}" config --quiet
-doppler run -- "${compose[@]}" build --pull
+docker build --pull --tag "lilacmacro-services:${release_sha}" .
 doppler run -- "${compose[@]}" up -d postgres
 doppler run -- env PROJECT_NAME="${project}" bash -c '
   docker compose --project-name "${PROJECT_NAME}" -f compose.yml --profile tools run --rm --no-deps \

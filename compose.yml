@@ -1,6 +1,4 @@
 x-runtime: &runtime
-  build:
-    context: .
   image: lilacmacro-services:${RELEASE_SHA:-local}
   restart: unless-stopped
   init: true
