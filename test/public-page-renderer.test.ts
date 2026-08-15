@@ -7,6 +7,7 @@ import { Ed25519SnapshotSigner } from '../src/infrastructure/snapshot-signer.js'
 
 const template = [
   '<a href="__LILAC_DOWNLOAD_URL__">Download</a>',
+  '<a href="__LILAC_DISCORD_INSTALL_URL__">Install Discord app</a>',
   '<div data-state="__LILAC_STATUS_STATE__">__LILAC_STATUS_TEXT__</div>',
 ].join('');
 
@@ -30,21 +31,34 @@ test('public home renders direct installer and status from a fresh signed snapsh
     template,
     await signer.sign(state, now),
     { 'test-1': publicKey },
+    '123456789012345678',
     now,
     0,
   );
 
   assert.match(html, /releases\/download\/v1\.2\.3\/LilacMacro-Setup\.exe/);
+  assert.match(html, /discord\.com\/oauth2\/authorize\?client_id=123456789012345678/);
   assert.match(html, /data-state="available"/);
   assert.match(html, /Game available/);
   assert.doesNotMatch(html, /__LILAC_/);
 });
 
 test('public home falls back safely when a snapshot cannot be trusted', () => {
-  const html = renderPublicHome(template, null, {}, new Date('2026-08-14T12:00:00.000Z'), 0);
+  const html = renderPublicHome(
+    template,
+    null,
+    {},
+    '123456789012345678',
+    new Date('2026-08-14T12:00:00.000Z'),
+    0,
+  );
 
   assert.match(html, /releases\/latest/);
   assert.match(html, /data-state="unknown"/);
   assert.match(html, /Status temporarily unavailable/);
   assert.doesNotMatch(html, /__LILAC_/);
+});
+
+test('public home rejects an unsafe Discord client ID', () => {
+  assert.throws(() => renderPublicHome(template, null, {}, '1&scope=identify', new Date(), 0));
 });

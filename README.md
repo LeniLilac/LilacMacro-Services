@@ -4,6 +4,8 @@ Private service repository for the LilacMacro public website, Discord applicatio
 
 The Windows macro remains in the separate LilacMacro repository. This service never supplies executable automation or installer content; downloads resolve directly to official GitHub Releases.
 
+The public landing page also exposes Discord's provider-owned install flow. Commands support both user and guild installation contexts, but every operation still checks the closed administrator-ID allowlist independently.
+
 ## Development
 
 Requirements: Node.js 24 LTS, npm, Docker, and Docker Compose.

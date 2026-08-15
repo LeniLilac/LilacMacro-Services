@@ -164,31 +164,29 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     return reply.code(statusFor(error)).send({ error: message });
   });
 
+  const publicKeys = {
+    [dependencies.config.CONTROL_SIGNING_KEY_ID]:
+      dependencies.config.CONTROL_SIGNING_PUBLIC_KEY_BASE64,
+  };
+  const renderHome = (snapshot: Parameters<typeof renderPublicHome>[1], revision: number) =>
+    renderPublicHome(
+      publicHomeTemplate,
+      snapshot,
+      publicKeys,
+      dependencies.config.DISCORD_BOT_CLIENT_ID,
+      dependencies.clock.now(),
+      revision,
+    );
+
   app.get('/', async (_request, reply) => {
-    const publicKeys = {
-      [dependencies.config.CONTROL_SIGNING_KEY_ID]:
-        dependencies.config.CONTROL_SIGNING_PUBLIC_KEY_BASE64,
-    };
     try {
       const [state, snapshot] = await Promise.all([
         dependencies.controlRepository.readState(),
         dependencies.controlRepository.readPublished(),
       ]);
-      return reply
-        .type('text/html')
-        .send(
-          renderPublicHome(
-            publicHomeTemplate,
-            snapshot,
-            publicKeys,
-            dependencies.clock.now(),
-            state.revision,
-          ),
-        );
+      return reply.type('text/html').send(renderHome(snapshot, state.revision));
     } catch {
-      return reply
-        .type('text/html')
-        .send(renderPublicHome(publicHomeTemplate, null, publicKeys, dependencies.clock.now(), 0));
+      return reply.type('text/html').send(renderHome(null, 0));
     }
   });
   app.get('/privacy', async (_request, reply) =>

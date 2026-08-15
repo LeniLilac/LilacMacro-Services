@@ -7,6 +7,7 @@ export function renderPublicHome(
   template: string,
   snapshot: SignedControlSnapshot | null,
   publicKeys: Readonly<Record<string, string>>,
+  discordClientId: string,
   now: Date,
   minimumRevision: number,
 ): string {
@@ -31,8 +32,14 @@ export function renderPublicHome(
 
   return template
     .replaceAll('__LILAC_DOWNLOAD_URL__', escapeAttribute(downloadUrl))
+    .replaceAll('__LILAC_DISCORD_INSTALL_URL__', discordInstallUrl(discordClientId))
     .replaceAll('__LILAC_STATUS_TEXT__', escapeText(status))
     .replaceAll('__LILAC_STATUS_STATE__', statusState);
+}
+
+function discordInstallUrl(clientId: string): string {
+  if (!/^\d+$/.test(clientId)) throw new Error('Discord client ID was invalid.');
+  return `https://discord.com/oauth2/authorize?client_id=${clientId}`;
 }
 
 function escapeText(value: string): string {
