@@ -14,7 +14,9 @@ const result = await new CloudflareProvisioner().provision({
 
 await storeDopplerSecret('CLOUDFLARE_TUNNEL_TOKEN', result.tunnelToken);
 await storeDopplerSecret('CLOUDFLARE_TUNNEL_ID', result.tunnelId);
-console.error(`Cloudflare tunnel and DNS are configured for ${publicHostname}.`);
+console.error(
+  `Cloudflare tunnel, canonical DNS, and apex/www redirects are configured for ${publicHostname}.`,
+);
 
 function required(name: string): string {
   const value = process.env[name];

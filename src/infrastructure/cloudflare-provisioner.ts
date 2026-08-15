@@ -24,7 +24,23 @@ const dnsRecordSchema = z.object({
   content: z.string(),
   proxied: z.boolean().optional(),
 });
+const rulesetSummarySchema = z.object({
+  id: identifier,
+  kind: z.string(),
+  phase: z.string(),
+});
+const ruleSummarySchema = z
+  .object({
+    id: identifier,
+    ref: z.string().optional(),
+  })
+  .passthrough();
+const rulesetSchema = rulesetSummarySchema.extend({
+  rules: z.array(ruleSummarySchema).default([]),
+});
 const envelopeSchema = z.object({ success: z.literal(true), result: z.unknown() });
+const redirectPhase = 'http_request_dynamic_redirect';
+const redirectRuleRef = 'lilacmacro_canonical_origin';
 
 export interface CloudflareProvisioningInput {
   accountId: string;
@@ -40,6 +56,8 @@ export interface CloudflareProvisioningResult {
   tunnelToken: string;
   zoneId: string;
   dnsRecordId: string;
+  redirectDnsRecordIds: string[];
+  redirectRulesetId: string;
 }
 
 export class CloudflareProvisioner {
@@ -54,13 +72,22 @@ export class CloudflareProvisioner {
     const tunnel = await this.requireTunnel(input);
     await this.configureTunnel(input, tunnel.id);
     const record = await this.upsertDnsRecord(input, zone.id, tunnel.id);
+    const redirectDnsRecords = await this.upsertRedirectDnsRecords(input, zone.id, tunnel.id);
+    const redirectRuleset = await this.upsertCanonicalRedirect(input, zone.id);
     const tunnelToken = await this.request(
       input.accountApiToken,
       `/accounts/${input.accountId}/cfd_tunnel/${tunnel.id}/token`,
       'GET',
       z.string().min(20).max(4_096),
     );
-    return { tunnelId: tunnel.id, tunnelToken, zoneId: zone.id, dnsRecordId: record.id };
+    return {
+      tunnelId: tunnel.id,
+      tunnelToken,
+      zoneId: zone.id,
+      dnsRecordId: record.id,
+      redirectDnsRecordIds: redirectDnsRecords.map(({ id }) => id),
+      redirectRulesetId: redirectRuleset.id,
+    };
   }
 
   private async requireZone(
@@ -158,10 +185,117 @@ export class CloudflareProvisioner {
     );
   }
 
+  private async upsertRedirectDnsRecords(
+    input: z.infer<typeof inputSchema>,
+    zoneId: string,
+    tunnelId: string,
+  ): Promise<Array<z.infer<typeof dnsRecordSchema>>> {
+    const redirectHostnames = [input.zoneName, `www.${input.zoneName}`];
+    const records = [];
+    for (const redirectHostname of redirectHostnames) {
+      records.push(
+        await this.replaceDnsHostnameWithTunnelAlias(
+          input.zoneApiToken,
+          zoneId,
+          redirectHostname,
+          tunnelId,
+        ),
+      );
+    }
+    return records;
+  }
+
+  private async replaceDnsHostnameWithTunnelAlias(
+    apiToken: string,
+    zoneId: string,
+    recordHostname: string,
+    tunnelId: string,
+  ): Promise<z.infer<typeof dnsRecordSchema>> {
+    const records = await this.request(
+      apiToken,
+      `/zones/${zoneId}/dns_records?name=${encodeURIComponent(recordHostname)}`,
+      'GET',
+      z.array(dnsRecordSchema).max(20),
+    );
+    const aliases = records.filter(({ type }) => type === 'CNAME');
+    if (aliases.length > 1 || (aliases.length === 1 && records.length > 1)) {
+      throw new Error('Cloudflare redirect DNS hostname was ambiguous.');
+    }
+    for (const record of records.filter(({ type }) => type !== 'CNAME')) {
+      await this.request(
+        apiToken,
+        `/zones/${zoneId}/dns_records/${record.id}`,
+        'DELETE',
+        z.unknown(),
+      );
+    }
+    const existing = aliases[0];
+    const body = {
+      type: 'CNAME',
+      name: recordHostname,
+      content: `${tunnelId}.cfargotunnel.com`,
+      ttl: 1,
+      proxied: true,
+      comment: 'LilacMacro canonical-origin redirect',
+    };
+    return this.request(
+      apiToken,
+      existing ? `/zones/${zoneId}/dns_records/${existing.id}` : `/zones/${zoneId}/dns_records`,
+      existing ? 'PUT' : 'POST',
+      dnsRecordSchema,
+      body,
+    );
+  }
+
+  private async upsertCanonicalRedirect(
+    input: z.infer<typeof inputSchema>,
+    zoneId: string,
+  ): Promise<z.infer<typeof rulesetSchema>> {
+    const summaries = await this.request(
+      input.zoneApiToken,
+      `/zones/${zoneId}/rulesets`,
+      'GET',
+      z.array(rulesetSummarySchema).max(100),
+    );
+    const phaseRulesets = summaries.filter(
+      ({ kind, phase }) => kind === 'zone' && phase === redirectPhase,
+    );
+    if (phaseRulesets.length > 1) throw new Error('Cloudflare redirect ruleset was ambiguous.');
+    const rule = canonicalRedirectRule(input.zoneName, input.publicHostname);
+    const summary = phaseRulesets[0];
+    if (!summary) {
+      return this.request(input.zoneApiToken, `/zones/${zoneId}/rulesets`, 'POST', rulesetSchema, {
+        name: 'LilacMacro canonical redirects',
+        description: 'Redirect public aliases to the canonical LilacMacro origin.',
+        kind: 'zone',
+        phase: redirectPhase,
+        rules: [rule],
+      });
+    }
+    const ruleset = await this.request(
+      input.zoneApiToken,
+      `/zones/${zoneId}/rulesets/${summary.id}`,
+      'GET',
+      rulesetSchema,
+    );
+    const ownedRules = ruleset.rules.filter(({ ref }) => ref === redirectRuleRef);
+    if (ownedRules.length > 1) throw new Error('Cloudflare canonical redirect rule was ambiguous.');
+    const ownedRule = ownedRules[0];
+    return this.request(
+      input.zoneApiToken,
+      ownedRule
+        ? `/zones/${zoneId}/rulesets/${ruleset.id}/rules/${ownedRule.id}`
+        : `/zones/${zoneId}/rulesets/${ruleset.id}/rules`,
+      ownedRule ? 'PATCH' : 'POST',
+      rulesetSchema,
+      rule,
+    );
+  }
+
   private async request<T>(
     apiToken: string,
     path: string,
-    method: 'GET' | 'POST' | 'PUT',
+    method: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT',
     resultSchema: z.ZodType<T>,
     body?: unknown,
   ): Promise<T> {
@@ -182,6 +316,25 @@ export class CloudflareProvisioner {
     const parsed = envelopeSchema.parse(await readBoundedJson(response));
     return resultSchema.parse(parsed.result);
   }
+}
+
+function canonicalRedirectRule(zoneName: string, publicHostname: string): Record<string, unknown> {
+  return {
+    ref: redirectRuleRef,
+    expression: `(http.host eq "${zoneName}" or http.host eq "www.${zoneName}")`,
+    description: 'Redirect apex and www to the canonical LilacMacro origin.',
+    action: 'redirect',
+    action_parameters: {
+      from_value: {
+        target_url: {
+          expression: `concat("https://${publicHostname}", http.request.uri.path)`,
+        },
+        status_code: 308,
+        preserve_query_string: true,
+      },
+    },
+    enabled: true,
+  };
 }
 
 function assertHostnameInZone(publicHostname: string, zoneName: string): void {
