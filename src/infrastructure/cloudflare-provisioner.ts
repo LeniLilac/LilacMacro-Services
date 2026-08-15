@@ -8,7 +8,8 @@ const hostname = z
 const inputSchema = z
   .object({
     accountId: identifier,
-    apiToken: z.string().min(20).max(512),
+    accountApiToken: z.string().min(20).max(512),
+    zoneApiToken: z.string().min(20).max(512),
     zoneName: hostname,
     publicHostname: hostname,
     tunnelName: z.string().regex(/^[a-z0-9][a-z0-9-]{2,62}$/),
@@ -27,7 +28,8 @@ const envelopeSchema = z.object({ success: z.literal(true), result: z.unknown() 
 
 export interface CloudflareProvisioningInput {
   accountId: string;
-  apiToken: string;
+  accountApiToken: string;
+  zoneApiToken: string;
   zoneName: string;
   publicHostname: string;
   tunnelName: string;
@@ -53,7 +55,7 @@ export class CloudflareProvisioner {
     await this.configureTunnel(input, tunnel.id);
     const record = await this.upsertDnsRecord(input, zone.id, tunnel.id);
     const tunnelToken = await this.request(
-      input,
+      input.accountApiToken,
       `/accounts/${input.accountId}/cfd_tunnel/${tunnel.id}/token`,
       'GET',
       z.string().min(20).max(4_096),
@@ -65,7 +67,7 @@ export class CloudflareProvisioner {
     input: z.infer<typeof inputSchema>,
   ): Promise<z.infer<typeof zoneSchema>> {
     const zones = await this.request(
-      input,
+      input.zoneApiToken,
       `/zones?name=${encodeURIComponent(input.zoneName)}&status=active`,
       'GET',
       z.array(zoneSchema).max(2),
@@ -80,7 +82,7 @@ export class CloudflareProvisioner {
     input: z.infer<typeof inputSchema>,
   ): Promise<z.infer<typeof tunnelSchema>> {
     const tunnels = await this.request(
-      input,
+      input.accountApiToken,
       `/accounts/${input.accountId}/cfd_tunnel?name=${encodeURIComponent(input.tunnelName)}&is_deleted=false`,
       'GET',
       z.array(tunnelSchema).max(2),
@@ -91,10 +93,16 @@ export class CloudflareProvisioner {
         throw new Error('Cloudflare tunnel name mismatched.');
       return tunnels[0];
     }
-    return this.request(input, `/accounts/${input.accountId}/cfd_tunnel`, 'POST', tunnelSchema, {
-      name: input.tunnelName,
-      config_src: 'cloudflare',
-    });
+    return this.request(
+      input.accountApiToken,
+      `/accounts/${input.accountId}/cfd_tunnel`,
+      'POST',
+      tunnelSchema,
+      {
+        name: input.tunnelName,
+        config_src: 'cloudflare',
+      },
+    );
   }
 
   private async configureTunnel(
@@ -102,7 +110,7 @@ export class CloudflareProvisioner {
     tunnelId: string,
   ): Promise<void> {
     await this.request(
-      input,
+      input.accountApiToken,
       `/accounts/${input.accountId}/cfd_tunnel/${tunnelId}/configurations`,
       'PUT',
       z.unknown(),
@@ -123,7 +131,7 @@ export class CloudflareProvisioner {
     tunnelId: string,
   ): Promise<z.infer<typeof dnsRecordSchema>> {
     const records = await this.request(
-      input,
+      input.zoneApiToken,
       `/zones/${zoneId}/dns_records?name=${encodeURIComponent(input.publicHostname)}`,
       'GET',
       z.array(dnsRecordSchema).max(2),
@@ -142,7 +150,7 @@ export class CloudflareProvisioner {
       comment: 'LilacMacro Services managed tunnel',
     };
     return this.request(
-      input,
+      input.zoneApiToken,
       existing ? `/zones/${zoneId}/dns_records/${existing.id}` : `/zones/${zoneId}/dns_records`,
       existing ? 'PUT' : 'POST',
       dnsRecordSchema,
@@ -151,7 +159,7 @@ export class CloudflareProvisioner {
   }
 
   private async request<T>(
-    input: z.infer<typeof inputSchema>,
+    apiToken: string,
     path: string,
     method: 'GET' | 'POST' | 'PUT',
     resultSchema: z.ZodType<T>,
@@ -160,7 +168,7 @@ export class CloudflareProvisioner {
     const response = await this.fetcher(`https://api.cloudflare.com/client/v4${path}`, {
       method,
       headers: {
-        authorization: `Bearer ${input.apiToken}`,
+        authorization: `Bearer ${apiToken}`,
         accept: 'application/json',
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       },

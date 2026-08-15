@@ -39,16 +39,10 @@ if (!/^[A-Za-z0-9/_-]{1,180}$/.test(prefix) || prefix.includes('..')) {
 if (!process.env.DOPPLER_TOKEN) throw new Error('DOPPLER_TOKEN is required.');
 
 const authorization = await authorize(
-  required('BACKBLAZE_OWNER_KEY_ID'),
-  required('BACKBLAZE_OWNER_APPLICATION_KEY'),
+  required('BACKBLAZEMASTERKEYID'),
+  required('BACKBLAZEMASTERKEYTOKEN'),
 );
-for (const capability of [
-  'writeKeys',
-  'deleteKeys',
-  'listBuckets',
-  'readBucketLifecycleRules',
-  'writeBucketLifecycleRules',
-]) {
+for (const capability of ['writeKeys', 'deleteKeys', 'listBuckets']) {
   if (!authorization.apiInfo.storageApi.allowed.capabilities.includes(capability)) {
     throw new Error(`Backblaze provisioning authority lacks ${capability}.`);
   }
@@ -170,8 +164,8 @@ async function configureLifecycle(): Promise<void> {
     region: required('BACKBLAZEREGION'),
     forcePathStyle: true,
     credentials: {
-      accessKeyId: required('BACKBLAZE_OWNER_KEY_ID'),
-      secretAccessKey: required('BACKBLAZE_OWNER_APPLICATION_KEY'),
+      accessKeyId: required('BACKBLAZEBUCKETKEYID'),
+      secretAccessKey: required('BACKBLAZEBUCKETKEY'),
     },
   });
   const id = 'lilacmacro-diagnostics-retention-v1';

@@ -5,7 +5,8 @@ const publicOrigin = required('PUBLIC_ORIGIN');
 const publicHostname = new URL(publicOrigin).hostname;
 const result = await new CloudflareProvisioner().provision({
   accountId: required('CLOUDFLARE_ACCOUNT_ID'),
-  apiToken: required('CLOUDFLARE_API_TOKEN'),
+  accountApiToken: required('CLOUDFLARE_API_TOKEN'),
+  zoneApiToken: required('CLOUDFLARE_API_TOKEN_DOMAIN'),
   zoneName: process.env.CLOUDFLARE_ZONE_NAME ?? 'expeditions.gg',
   publicHostname,
   tunnelName: process.env.CLOUDFLARE_TUNNEL_NAME ?? 'lilacmacro-services-production',

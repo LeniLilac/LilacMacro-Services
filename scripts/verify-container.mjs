@@ -101,6 +101,20 @@ if (environmentOf('cloudflared').TUNNEL_TOKEN !== 'container-check-not-connected
 for (const name of ['api', 'control', 'bot', 'worker', 'postgres']) {
   mustNotHave(name, 'TUNNEL_TOKEN');
 }
+for (const name of ['api', 'control', 'bot', 'worker', 'migrator', 'postgres', 'cloudflared']) {
+  for (const key of [
+    'BACKBLAZE_OWNER_KEY_ID',
+    'BACKBLAZE_OWNER_APPLICATION_KEY',
+    'BACKBLAZEMASTERKEYID',
+    'BACKBLAZEMASTERKEYTOKEN',
+    'BACKBLAZEBUCKETKEYID',
+    'BACKBLAZEBUCKETKEY',
+    'CLOUDFLARE_API_TOKEN',
+    'CLOUDFLARE_API_TOKEN_DOMAIN',
+  ]) {
+    mustNotHave(name, key);
+  }
+}
 if (
   services.api.networks?.edge?.ipv4_address !== '10.250.254.2' ||
   services.cloudflared.networks?.edge?.ipv4_address !== '10.250.254.3'

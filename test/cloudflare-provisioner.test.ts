@@ -8,7 +8,8 @@ const dnsId = 'c'.repeat(32);
 const tunnelId = '11111111-1111-4111-8111-111111111111';
 const input = {
   accountId,
-  apiToken: 'test-token-with-sufficient-length',
+  accountApiToken: 'account-token-with-sufficient-length',
+  zoneApiToken: 'zone-token-with-sufficient-length',
   zoneName: 'expeditions.gg',
   publicHostname: 'macro.expeditions.gg',
   tunnelName: 'lilacmacro-services-production',
@@ -65,7 +66,16 @@ test('Cloudflare provisioning updates one exact tunnel, ingress, and proxied DNS
     proxied: true,
     comment: 'LilacMacro Services managed tunnel',
   });
-  assert.ok(requests.every((request) => !request.url.includes(input.apiToken)));
+  for (const request of requests) {
+    const authorization = new Headers(request.init?.headers).get('authorization');
+    if (request.url.includes('/zones')) {
+      assert.equal(authorization, `Bearer ${input.zoneApiToken}`);
+    } else {
+      assert.equal(authorization, `Bearer ${input.accountApiToken}`);
+    }
+  }
+  assert.ok(requests.every((request) => !request.url.includes(input.accountApiToken)));
+  assert.ok(requests.every((request) => !request.url.includes(input.zoneApiToken)));
 });
 
 test('Cloudflare provisioning creates missing tunnel and DNS resources', async () => {
