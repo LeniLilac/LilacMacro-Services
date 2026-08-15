@@ -44,6 +44,7 @@ export async function startTemporaryPostgres(): Promise<TemporaryPostgres> {
     started = true;
     const connectionString = `postgresql://postgres@127.0.0.1:${port}/postgres`;
     pool = createPool(connectionString);
+    await installRuntimeRoles(pool);
     await installMigrations(pool);
     const activePool = pool;
     return {
@@ -84,6 +85,7 @@ async function startExternalPostgres(baseUrl: string): Promise<TemporaryPostgres
   const url = new URL(baseUrl);
   url.pathname = `/${database}`;
   try {
+    await installRuntimeRoles(admin);
     await admin.query(`CREATE DATABASE "${database}"`);
     const pool = createPool(url.toString());
     await installMigrations(pool);
@@ -111,27 +113,41 @@ async function installMigrations(pool: Pool): Promise<void> {
   const migrationsDirectory = fileURLToPath(new URL('../../migrations/', import.meta.url));
   const initial = await readFile(path.join(migrationsDirectory, '001_initial.sql'), 'utf8');
   await pool.query(initial);
-  await pool.query(`DO $$
-    BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lilacmacro_api') THEN
-        CREATE ROLE lilacmacro_api LOGIN;
-      END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lilacmacro_control') THEN
-        CREATE ROLE lilacmacro_control LOGIN;
-      END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lilacmacro_worker') THEN
-        CREATE ROLE lilacmacro_worker LOGIN;
-      END IF;
-    END
-  $$`);
-  for (const role of ['lilacmacro_api', 'lilacmacro_control', 'lilacmacro_worker']) {
-    await pool.query(`ALTER ROLE ${role} PASSWORD 'test-runtime-role-password'`);
-  }
   const remaining = (await readdir(migrationsDirectory))
     .filter((name) => /^\d+_.+\.sql$/.test(name) && name !== '001_initial.sql')
     .sort();
   for (const name of remaining) {
     await pool.query(await readFile(path.join(migrationsDirectory, name), 'utf8'));
+  }
+}
+
+async function installRuntimeRoles(pool: Pool): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock($1)', [1_946_919_983]);
+    await client.query(`DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lilacmacro_api') THEN
+          CREATE ROLE lilacmacro_api LOGIN;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lilacmacro_control') THEN
+          CREATE ROLE lilacmacro_control LOGIN;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lilacmacro_worker') THEN
+          CREATE ROLE lilacmacro_worker LOGIN;
+        END IF;
+      END
+    $$`);
+    for (const role of ['lilacmacro_api', 'lilacmacro_control', 'lilacmacro_worker']) {
+      await client.query(`ALTER ROLE ${role} PASSWORD 'test-runtime-role-password'`);
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
