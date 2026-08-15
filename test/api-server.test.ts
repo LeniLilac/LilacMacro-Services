@@ -137,6 +137,8 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(landing.statusCode, 200);
     assert.match(landing.headers['cache-control'] ?? '', /max-age=300/);
     assert.match(landing.body, /class="product-figure hero-product"/);
+    assert.match(landing.body, /landing\.css\?v=firefox-mobile-1/);
+    assert.match(landing.body, /site\.js\?v=firefox-mobile-1/);
     assert.doesNotMatch(landing.body, /loading="lazy"/);
     assert.doesNotMatch(landing.body, /id="setup"|id="safety"/);
     const landingCss = await app.inject({ method: 'GET', url: '/assets/landing.css' });
