@@ -1,14 +1,16 @@
 import { z } from 'zod';
 
-const playabilitySchema = z.array(
-  z
-    .object({
-      universeId: z.number().int().positive(),
-      isPlayable: z.boolean(),
-      playabilityStatus: z.string().min(1),
-    })
-    .passthrough(),
-);
+const publicGameDetailsSchema = z
+  .object({
+    data: z.array(
+      z
+        .object({
+          id: z.number().int().positive(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
 
 export class RobloxPlayabilityProbe {
   public constructor(
@@ -17,16 +19,18 @@ export class RobloxPlayabilityProbe {
   ) {}
 
   public async current(): Promise<boolean> {
-    const url = new URL('https://games.roblox.com/v1/games/multiget-playability-status');
+    const url = new URL('https://games.roblox.com/v1/games');
     url.searchParams.set('universeIds', this.universeId);
     const response = await this.fetcher(url, {
       headers: { accept: 'application/json', 'user-agent': 'LilacMacro-Services/1' },
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new Error('Roblox playability lookup failed.');
-    const result = playabilitySchema.parse(await response.json());
-    const match = result.find((item) => String(item.universeId) === this.universeId);
-    if (!match) throw new Error('Roblox playability response omitted the configured universe.');
-    return match.isPlayable;
+    const result = publicGameDetailsSchema.parse(await response.json());
+    if (result.data.length === 0) return false;
+    if (result.data.some((item) => String(item.id) !== this.universeId)) {
+      throw new Error('Roblox public game response returned an unexpected universe.');
+    }
+    return result.data.some((item) => String(item.id) === this.universeId);
   }
 }

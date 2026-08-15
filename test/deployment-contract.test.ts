@@ -21,3 +21,18 @@ test('production deployment waits for PostgreSQL and gates each database phase',
     'database phases must inherit the outer fail-fast shell independently',
   );
 });
+
+test('runtime promotion verifies the signed control contract before public readiness', async () => {
+  const verification = await readFile('ops/verify-runtime.sh', 'utf8');
+  const signedContract = verification.indexOf(
+    'exec -T api node dist/scripts/verify-control-snapshot.js',
+  );
+  const publicReadiness = verification.indexOf('"${origin}/health/ready"');
+
+  assert.ok(signedContract >= 0, 'runtime verification must validate the signed control contract');
+  assert.ok(publicReadiness >= 0, 'runtime verification must retain the public readiness check');
+  assert.ok(
+    signedContract < publicReadiness,
+    'signed control verification must pass before public promotion succeeds',
+  );
+});

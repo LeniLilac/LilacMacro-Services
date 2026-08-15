@@ -267,17 +267,29 @@ test('GitHub release probe accepts only the official stable installer inventory'
   );
 });
 
-test('Roblox playability probe binds the configured universe and rejects incomplete responses', async () => {
+test('Roblox playability probe uses the public universe listing instead of guest playability', async () => {
   const fetcher: typeof fetch = async (input) => {
-    assert.match(String(input), /universeIds=12345/);
-    return new Response(
-      JSON.stringify([{ universeId: 12345, isPlayable: true, playabilityStatus: 'Playable' }]),
-    );
+    assert.equal(String(input), 'https://games.roblox.com/v1/games?universeIds=12345');
+    return new Response(JSON.stringify({ data: [{ id: 12345, name: 'Anime Expeditions' }] }));
   };
   assert.equal(await new RobloxPlayabilityProbe('12345', fetcher).current(), true);
+  assert.equal(
+    await new RobloxPlayabilityProbe(
+      '12345',
+      async () => new Response(JSON.stringify({ data: [] })),
+    ).current(),
+    false,
+  );
+  await assert.rejects(
+    new RobloxPlayabilityProbe(
+      '12345',
+      async () => new Response(JSON.stringify({ data: [{ id: 54321 }] })),
+    ).current(),
+    /unexpected universe/,
+  );
   await assert.rejects(
     new RobloxPlayabilityProbe('12345', async () => new Response('[]')).current(),
-    /omitted/,
+    /Invalid input/,
   );
   await assert.rejects(
     new RobloxPlayabilityProbe('12345', async () => new Response('{}', { status: 500 })).current(),

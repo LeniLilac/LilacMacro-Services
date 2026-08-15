@@ -11,12 +11,14 @@ The site, OAuth console, signed API, and diagnostic broker use one canonical ori
 
 Before the first deployment or after changing the public hostname, run the built `configure:cloudflare` command through Doppler. It idempotently creates or updates one named tunnel, its exact hostname-to-`http://api:3100` ingress plus a 404 catch-all, and one proxied CNAME. `CLOUDFLARE_API_TOKEN` is an account-owned token limited to Cloudflare Tunnel Write; `CLOUDFLARE_API_TOKEN_DOMAIN` is a separate token limited to Zone Read and DNS Write for the exact zone. The provisioner never sends either token to the other resource scope. The returned tunnel credential is written directly to Doppler over stdin and is never printed. Production defaults to the `lilacmacro-services-production` tunnel; staging must use a distinct tunnel name and Doppler configuration.
 
+Cloudflare configuration does not by itself make the hostname authoritative. Before declaring an environment public, query the parent zone's public nameservers and confirm which DNS provider is delegated. If the existing registrar DNS remains authoritative, create or replace only the environment hostname there with a CNAME to the provisioned `<tunnel-id>.cfargotunnel.com` target and remove any conflicting parking record. Do not change the zone nameservers merely to activate this service. A full nameserver migration is a separate operation: first reproduce and verify every existing zone record in Cloudflare, then change delegation at the registrar. After either activation path, require public recursive DNS to return the intended CNAME chain and require the canonical HTTPS `/health/ready` response; Cloudflare dashboard state or an origin-loopback check is insufficient proof.
+
 The existing VPS host and unprivileged deploy identity are recorded only in `.local/vps.info`. Root access is break-glass.
 
 ## Health and rollback
 
 - `/health/live` proves the process is alive.
-- `/health/ready` verifies database connectivity and signing/public-key consistency without contacting optional vendors.
+- `/health/ready` verifies database connectivity and signing/public-key consistency without contacting optional vendors. The deployment gate additionally fetches `/v1/control` inside the API container and verifies its exact Ed25519 signature, schema, freshness, and lifetime using the configured public key before checking the public origin.
 - `cloudflared tunnel ready` verifies an established edge connection, and the deployment gate then reaches `/health/ready` through the canonical HTTPS origin.
 - Deployment stages an exact Git commit, builds its immutable application image once for reuse by every Node role, waits for PostgreSQL to report healthy, provisions runtime roles in a fail-closed one-shot phase, then runs migrations under a separate fail-closed phase. It starts the candidate, waits for readiness, and prunes the prior release only after success.
 - A failed readiness check restores the previous source/image/database-compatible process set.

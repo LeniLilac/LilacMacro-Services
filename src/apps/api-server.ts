@@ -25,6 +25,7 @@ import { parseVerifyAndValidateSnapshot } from '../infrastructure/snapshot-signe
 import { TrustedProxyAddressResolver } from '../infrastructure/trusted-proxy.js';
 import { authorizeAdmin, csrfFor, registerAuthRoutes } from './auth-routes.js';
 import { registerDiagnosticInternalRoutes } from './internal-routes.js';
+import { renderPublicHome } from './public-page-renderer.js';
 
 const completionSchema = z
   .object({
@@ -78,6 +79,9 @@ export interface ApiDependencies {
 
 export async function buildApi(dependencies: ApiDependencies): Promise<FastifyInstance> {
   const publicRoot = path.resolve('dist/public');
+  const publicHomeTemplate = await (
+    await import('node:fs/promises')
+  ).readFile(path.join(publicRoot, 'index.html'), 'utf8');
   const clientAddresses = new TrustedProxyAddressResolver(dependencies.config.trustedProxyCidrs);
   const app = Fastify({
     logger: {
@@ -160,9 +164,33 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     return reply.code(statusFor(error)).send({ error: message });
   });
 
-  app.get('/', async (_request, reply) =>
-    reply.type('text/html').sendFile('index.html', publicRoot),
-  );
+  app.get('/', async (_request, reply) => {
+    const publicKeys = {
+      [dependencies.config.CONTROL_SIGNING_KEY_ID]:
+        dependencies.config.CONTROL_SIGNING_PUBLIC_KEY_BASE64,
+    };
+    try {
+      const [state, snapshot] = await Promise.all([
+        dependencies.controlRepository.readState(),
+        dependencies.controlRepository.readPublished(),
+      ]);
+      return reply
+        .type('text/html')
+        .send(
+          renderPublicHome(
+            publicHomeTemplate,
+            snapshot,
+            publicKeys,
+            dependencies.clock.now(),
+            state.revision,
+          ),
+        );
+    } catch {
+      return reply
+        .type('text/html')
+        .send(renderPublicHome(publicHomeTemplate, null, publicKeys, dependencies.clock.now(), 0));
+    }
+  });
   app.get('/privacy', async (_request, reply) =>
     reply.type('text/html').sendFile('privacy.html', publicRoot),
   );

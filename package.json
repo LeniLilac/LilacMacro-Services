@@ -16,6 +16,7 @@
     "test": "node --import tsx --test --test-concurrency=8 test/**/*.test.ts",
     "test:coverage": "c8 --all --src src --extension .ts --exclude 'src/apps/api.ts' --exclude 'src/apps/bot.ts' --exclude 'src/apps/control.ts' --exclude 'src/apps/worker.ts' --check-coverage --lines 80 --functions 80 --branches 75 --statements 80 npm test",
     "verify:container": "node scripts/verify-container.mjs",
+    "verify:control": "node dist/scripts/verify-control-snapshot.js",
     "verify:backblaze": "node dist/scripts/verify-backblaze-provider.js",
     "provision:backblaze-keys": "node dist/scripts/provision-backblaze-keys.js",
     "configure:cloudflare": "node dist/scripts/configure-cloudflare.js",

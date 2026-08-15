@@ -180,6 +180,7 @@ const required = [
   'dist/src/apps/worker.js',
   'dist/scripts/migrate.js',
   'dist/scripts/provision-db-roles.js',
+  'dist/scripts/verify-control-snapshot.js',
   'dist/public/index.html',
   'dist/public/admin.html',
   'scripts/check-heartbeat.mjs',

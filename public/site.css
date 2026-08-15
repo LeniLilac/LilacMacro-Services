@@ -189,6 +189,14 @@ h2 {
   background: var(--mint);
   box-shadow: 0 0 0 4px #45d7b033;
 }
+.status-strip[data-state='unavailable'] .status-dot {
+  background: var(--coral);
+  box-shadow: 0 0 0 4px #ff6b6b33;
+}
+.status-strip[data-state='unknown'] .status-dot {
+  background: var(--gold);
+  box-shadow: 0 0 0 4px #f2b44133;
+}
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -51,6 +51,8 @@ for index in "${!services[@]}"; do
   [[ "$(docker inspect --format '{{.State.Health.Status}}' "${id}")" == healthy ]] || exit 1
 done
 
+"${compose[@]}" exec -T api node dist/scripts/verify-control-snapshot.js
+
 origin="${PUBLIC_ORIGIN:?PUBLIC_ORIGIN is required}"
 [[ "${origin}" == https://* ]] || { echo "PUBLIC_ORIGIN must use HTTPS." >&2; exit 1; }
 curl --fail --silent --show-error --max-time 20 --proto '=https' --tlsv1.2 \
