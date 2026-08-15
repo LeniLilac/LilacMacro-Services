@@ -25,12 +25,10 @@ doppler run -- bash -c '
 }
 doppler run -- "${compose[@]}" config --quiet
 docker build --pull --tag "lilacmacro-services:${release_sha}" .
-doppler run -- "${compose[@]}" up -d postgres
-doppler run -- env PROJECT_NAME="${project}" bash -c '
-  docker compose --project-name "${PROJECT_NAME}" -f compose.yml --profile tools run --rm --no-deps \
-    migrator node dist/scripts/provision-db-roles.js
-  docker compose --project-name "${PROJECT_NAME}" -f compose.yml --profile tools run --rm --no-deps \
-    migrator node dist/scripts/migrate.js
-'
+doppler run -- "${compose[@]}" up -d --wait --wait-timeout 120 postgres
+doppler run -- "${compose[@]}" --profile tools run --rm --no-deps \
+  migrator node dist/scripts/provision-db-roles.js
+doppler run -- "${compose[@]}" --profile tools run --rm --no-deps \
+  migrator node dist/scripts/migrate.js
 doppler run -- "${compose[@]}" up -d --remove-orphans control api bot worker cloudflared
 doppler run -- env PROJECT_NAME="${project}" bash ops/verify-runtime.sh
