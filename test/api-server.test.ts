@@ -136,7 +136,8 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     const landing = await app.inject({ method: 'GET', url: '/' });
     assert.equal(landing.statusCode, 200);
     assert.match(landing.headers['cache-control'] ?? '', /max-age=300/);
-    assert.match(landing.body, /id="setup"/);
+    assert.match(landing.body, /class="product-figure hero-product"/);
+    assert.doesNotMatch(landing.body, /id="setup"|id="safety"/);
     const health = await app.inject({ method: 'GET', url: '/health/live' });
     assert.equal(health.statusCode, 200);
     assert.equal(health.headers['cache-control'], 'no-store');
