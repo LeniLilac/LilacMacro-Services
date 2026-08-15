@@ -195,7 +195,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.match(privacy.body, /90\s+days/);
     const terms = await app.inject({ method: 'GET', url: '/terms' });
     assert.equal(terms.statusCode, 200);
-    assert.match(terms.body, /Use LilacMacro carefully and lawfully/);
+    assert.match(terms.body, /Terms of Service/);
     assert.match(terms.headers['cache-control'] ?? '', /max-age=300/);
     const health = await app.inject({ method: 'GET', url: '/health/live' });
     assert.equal(health.statusCode, 200);

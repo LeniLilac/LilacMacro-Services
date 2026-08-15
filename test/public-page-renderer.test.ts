@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { renderPublicHome } from '../src/apps/public-page-renderer.js';
 import { defaultControlState } from '../src/infrastructure/memory-repositories.js';
@@ -56,4 +57,21 @@ test('public home falls back safely when a snapshot cannot be trusted', () => {
 
 test('public home rejects an unsafe Discord client ID', () => {
   assert.throws(() => renderPublicHome(template, null, {}, '1&scope=identify', new Date(), 0));
+});
+
+test('legal pages publish direct contact and the implemented privacy controls', async () => {
+  const [privacy, terms] = await Promise.all([
+    readFile('public/privacy.html', 'utf8'),
+    readFile('public/terms.html', 'utf8'),
+  ]);
+
+  for (const page of [privacy, terms]) {
+    assert.match(page, /mailto:lilithlilac000@gmail\.com/);
+    assert.doesNotMatch(page, /private contact channel|contact@vanguardvalues\.gg/);
+  }
+  assert.match(privacy, /Online features and\s+product telemetry are initially shown on/);
+  assert.match(privacy, /Telemetry is deleted after no more than 90 days/);
+  assert.match(privacy, /Routine archives expire after 72 hours/);
+  assert.match(terms, /PolyForm Noncommercial\s+License 1\.0\.0/);
+  assert.match(terms, /href="\/privacy">Privacy Policy<\/a>/);
 });

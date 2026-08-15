@@ -3,7 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Privacy · LilacMacro</title>
+    <meta
+      name="description"
+      content="Learn what LilacMacro keeps local, what its optional online features send, and how to change your privacy choices."
+    />
+    <title>Privacy Policy · LilacMacro</title>
     <link rel="stylesheet" href="/assets/site.css" />
   </head>
   <body>
@@ -11,85 +15,172 @@
       <a class="brand" href="/"><span class="brand-mark">L</span>LilacMacro</a>
     </header>
     <main class="document">
-      <div class="eyebrow">PRIVACY / NOTICE 01</div>
-      <h1>Your choices control what leaves the app.</h1>
+      <div class="eyebrow">PRIVACY / UPDATED AUGUST 15, 2026</div>
+      <h1>Privacy without guesswork.</h1>
       <p>
-        LilacMacro performs its automation locally. Before the first macro session, the app shows
-        three separate choices. Online features and product telemetry are initially shown on;
-        automatic error reports are initially off. Nothing covered by those choices is sent until
-        you save the screen, and every choice can be changed later in Settings.
+        This Privacy Policy explains how LilacMacro ("we," "us," or "our") handles information when
+        you use the LilacMacro Windows app, website, control service, and related support tools (the
+        "Services"). LilacMacro performs its automation locally. Optional online features are
+        separated so you can decide what leaves your device.
       </p>
+      <p>
+        <strong>Effective date:</strong> August 15, 2026. <strong>Last updated:</strong> August 15,
+        2026.
+      </p>
+
+      <h2>Your privacy choices</h2>
+      <p>
+        The app presents three separate choices before the first macro session. Online features and
+        product telemetry are initially shown on; automatic error reports are initially off. No data
+        covered by those choices is sent until you save the screen. You can change each choice later
+        in Settings.
+      </p>
+      <ul>
+        <li>
+          <strong>Online features.</strong> Controls requests for signed service status, public game
+          codes, maintenance notices, safety disables, official update metadata, and available
+          service-backed sharing features.
+        </li>
+        <li>
+          <strong>Product telemetry.</strong> Controls bounded events used to understand
+          reliability, feature use, expedition reward observations, and OCR performance.
+        </li>
+        <li>
+          <strong>Automatic error reports.</strong> Controls automatic creation and upload of a
+          limited light report or an existing Deep Debug archive after an error.
+        </li>
+      </ul>
+
       <h2>Online features</h2>
       <p>
-        When enabled, LilacMacro requests signed service status, public game codes, remote safety
-        disables for known bugs or maintenance, and official GitHub release metadata. It can also
-        use service-backed configuration sharing when that feature is available. Turning this off
-        prevents new LilacMacro service and update-check requests. One bounded request already in
-        flight can finish and update its local public cache. Local automation remains available, but
-        it will not receive current maintenance or safety status.
+        When online features are enabled, LilacMacro may request signed operational status, public
+        game codes, known-bug or maintenance disables, official GitHub release metadata, and
+        service-backed configuration sharing when available. Turning this choice off prevents new
+        LilacMacro service and update-check requests. One bounded request already in flight may
+        finish and update its local public cache. Local automation remains available, but it will
+        not receive current maintenance or safety status.
       </p>
+
       <h2>Product telemetry</h2>
       <p>
-        When enabled, the app sends a fixed, bounded event schema: app version; feature and outcome
-        identifiers; expedition material and quantity observations; error-state counters without
-        free-form exception text; OCR duration and CPU/GPU execution category; Windows version;
-        logical processor count; and process capability. Telemetry never includes screenshots, OCR
-        text, file paths, Roblox credentials, private-server links, Discord webhook URLs, raw
-        hardware identifiers, or raw IP addresses.
+        When telemetry is enabled, the app sends only fields from a fixed schema: app version;
+        feature and outcome identifiers; expedition material and quantity observations; error-state
+        counters without free-form exception text; OCR duration and CPU or GPU execution category;
+        Windows version; logical processor count; and process capability.
       </p>
       <p>
-        A random installation UUID is created locally. The service immediately converts it and the
-        normalized source network to separate rotating HMAC pseudonyms and stores no raw UUID or IP
-        address. The network pseudonym is used only for a daily abuse quota. Pseudonyms rotate
-        monthly using domains separate from diagnostic reports. Telemetry is used to estimate active
-        installations, understand feature use and error-prone states, tune OCR performance, and
-        inform manually reviewed expedition reward research. It is retained for no more than 90
-        days. Aggregates never automatically change macro behavior, reward distributions, or remote
-        control policy.
+        Telemetry does not include screenshots, OCR text, file paths, Roblox credentials,
+        private-server links, Discord webhook URLs, raw hardware identifiers, or raw IP addresses.
+        We do not sell personal information or use telemetry for targeted advertising.
       </p>
+      <p>
+        The app creates a random installation UUID locally. The service immediately converts that
+        UUID and the normalized source network into separate, monthly rotating HMAC pseudonyms. It
+        stores neither the raw UUID nor the raw IP address. The network pseudonym is used only for a
+        daily abuse quota. Stored telemetry and diagnostic pseudonyms use separate HMAC domains and
+        are not directly joinable in the database.
+      </p>
+      <p>
+        We use telemetry to estimate active installations, understand feature use and error-prone
+        states, improve OCR performance, and inform manually reviewed expedition reward research.
+        Aggregates never automatically change macro behavior, reward distributions, or remote
+        control policy. Telemetry is deleted after no more than 90 days.
+      </p>
+
       <h2>Automatic error reports</h2>
       <p>
         Automatic reports are a separate opt-in and are off initially. With Deep Debug off, an error
-        can create a temporary light report containing a sanitized event timeline, non-secret
-        display and plan counts, coarse device information, model/profile identifiers, macro
-        actions, and at most 32 already-acquired important frames. The archive has an 80 MiB hard
-        limit. OCR text, free-form exception text, paths, private-server links, Discord data, and
-        credentials are excluded, but Roblox pixels can still contain personal game data.
+        may create a temporary light report containing a sanitized event timeline, non-secret
+        display and plan counts, coarse device information, model and profile identifiers, macro
+        actions, and at most 32 important frames that the app already captured. The archive has an
+        80 MiB hard limit.
+      </p>
+      <p>
+        Light reports exclude OCR text, free-form exception text, file paths, private-server links,
+        Discord data, and credentials. Frames can still contain personal information visible inside
+        Roblox, so review what may be on screen before enabling automatic reports.
       </p>
       <p>
         With Deep Debug active, the completed Deep Debug archive is sent instead. Temporary light
         files are removed after the upload attempt. A successfully sent Deep Debug archive is
         removed; a failed Deep Debug upload remains local so you can inspect or retry it. When
-        automatic reports are off, the app neither creates a light report nor automatically sends or
-        deletes your Deep Debug archives.
+        automatic reports are off, the app does not create a light report and does not automatically
+        send or delete your Deep Debug archives.
       </p>
+
       <h2>Manual diagnostic uploads</h2>
       <p>
-        Settings also offers a separate manual upload control. It remains off until enabled and
-        always requires you to choose a specific ZIP. Routine archives expire after 72 hours.
-        Archives over 3 GiB require a short-lived administrator grant and can be retained for at
-        most seven days after explicit acceptance. Archives stay in private object storage and are
-        never served as public content.
+        Settings includes a separate manual upload control. It remains off until enabled and always
+        requires you to choose a specific ZIP file. Routine archives expire after 72 hours. Archives
+        over 3 GiB require a short-lived administrator grant and, if accepted, may be retained for
+        no more than seven days. Diagnostic archives remain in private object storage and are never
+        served as public content.
       </p>
+
+      <h2>Information kept on your device</h2>
+      <p>
+        Settings, plans, visual profiles, local logs, and Deep Debug archives stay on your Windows
+        device unless a feature described above sends them. Uninstalling LilacMacro does not
+        silently erase user-created datasets or retained diagnostics. You can remove local data with
+        ordinary Windows file management.
+      </p>
+
       <h2>Service records and providers</h2>
       <p>
-        The service keeps bounded request metadata, object keys, checksums, application versions,
-        and rotating abuse-prevention pseudonyms. It does not store raw IP addresses. Hosting and
-        delivery may involve Hetzner infrastructure, Cloudflare networking, PostgreSQL storage,
-        Backblaze B2 private object storage, GitHub Releases, and Discord authentication for the
-        administrator console. Those providers process limited service data under their own terms.
+        The service keeps limited operational records such as object keys, checksums, app versions,
+        audit entries, and rotating abuse-prevention pseudonyms. It does not store raw IP addresses.
+        We may share only the information needed to operate the Services with infrastructure and
+        authentication providers, including Hetzner, Cloudflare, PostgreSQL hosting, Backblaze B2,
+        GitHub, and Discord. Those providers process information under their own terms and privacy
+        policies. We may also disclose information when required by law or reasonably necessary to
+        protect users, the project, or the public.
       </p>
-      <h2>Local data and control</h2>
+
+      <h2>Retention and security</h2>
       <p>
-        Settings, plans, visual profiles, local logs, and Deep Debug archives remain on the Windows
-        device unless a feature described above sends them. Uninstalling does not silently erase
-        user-created datasets or retained diagnostics. Use ordinary Windows file management to
-        remove local data. To ask about server-held data, open a repository issue without including
-        personal data and request a private contact channel.
+        We retain information only as long as needed for the purposes described here, applicable
+        legal obligations, security, and dispute resolution. The specific telemetry and diagnostic
+        limits above control where they are shorter. We use measures such as HTTPS, access controls,
+        pseudonymization, private object storage, bounded schemas, and limited credentials. No
+        transmission or storage method is completely secure.
       </p>
+
+      <h2>Your rights and requests</h2>
       <p>
-        This notice describes the implemented product behavior; it is not a substitute for legal
-        advice. Last updated: August 15, 2026.
+        Depending on where you live, you may have rights to access, correct, delete, restrict, or
+        object to certain processing of personal information. You may also withdraw an optional app
+        choice at any time in Settings. Because telemetry identifiers rotate and the service does
+        not retain the raw installation UUID, we may be unable to identify a telemetry record as
+        yours. Email us to make a privacy request; we may ask for reasonable verification before
+        acting on it.
+      </p>
+
+      <h2>Children's privacy</h2>
+      <p>
+        The hosted Services are not directed to children under 13, and we do not knowingly collect
+        personal information from a child under 13. If you believe a child provided personal
+        information through the Services, contact us so we can investigate and delete it where
+        appropriate.
+      </p>
+
+      <h2>International processing</h2>
+      <p>
+        Information may be processed in the United States and in other countries where our service
+        providers operate. Those countries may have data-protection rules different from the rules
+        where you live.
+      </p>
+
+      <h2>Changes to this policy</h2>
+      <p>
+        We may update this Policy as the Services change. We will update the date above and, for a
+        material change to an in-app data choice, present a new notice version before the affected
+        feature resumes sending data.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions or privacy requests? Email
+        <a href="mailto:lilithlilac000@gmail.com">lilithlilac000@gmail.com</a>.
       </p>
     </main>
     <footer>
