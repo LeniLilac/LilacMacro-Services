@@ -87,9 +87,24 @@ test('pseudonyms rotate monthly and never expose source identifiers', () => {
   );
   const installId = randomUUID();
   const august = pseudonymizer.forInstall(installId, new Date('2026-08-14T00:00:00Z'));
+  const telemetryAugust = pseudonymizer.forTelemetryInstall(
+    installId,
+    new Date('2026-08-14T00:00:00Z'),
+  );
   const september = pseudonymizer.forInstall(installId, new Date('2026-09-01T00:00:00Z'));
   assert.notEqual(august, installId);
   assert.notEqual(august, september);
+  assert.notEqual(telemetryAugust, august);
+  assert.notEqual(telemetryAugust, installId);
+  const telemetryNetwork = pseudonymizer.forTelemetryNetwork(
+    '203.0.113.7',
+    new Date('2026-08-14T00:00:00Z'),
+  );
+  assert.notEqual(
+    telemetryNetwork,
+    pseudonymizer.forNetwork('203.0.113.7', new Date('2026-08-14T00:00:00Z')),
+  );
+  assert.notEqual(telemetryNetwork, telemetryAugust);
   assert.equal(
     pseudonymizer.forNetwork('::ffff:127.0.0.1', new Date('2026-08-14T00:00:00Z')),
     pseudonymizer.forNetwork('127.0.0.1', new Date('2026-08-14T00:00:00Z')),

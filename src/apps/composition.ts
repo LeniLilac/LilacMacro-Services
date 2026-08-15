@@ -21,6 +21,7 @@ import {
   PostgresDiagnosticRepository,
   createPool,
 } from '../infrastructure/postgres-repositories.js';
+import { PostgresTelemetryRepository } from '../infrastructure/postgres-telemetry-repository.js';
 import { RotatingPseudonymizer } from '../infrastructure/pseudonym.js';
 import { RobloxPlayabilityProbe } from '../infrastructure/roblox-playability.js';
 import { Ed25519SnapshotSigner } from '../infrastructure/snapshot-signer.js';
@@ -33,12 +34,14 @@ export function composeApiServices() {
   const clock = new SystemClock();
   const controlRepository = new PostgresControlRepository(pool);
   const diagnosticRepository = new PostgresDiagnosticRepository(pool);
+  const telemetryRepository = new PostgresTelemetryRepository(pool);
   return {
     config,
     pool,
     clock,
     controlRepository,
     diagnosticRepository,
+    telemetryRepository,
     controlClient: new InternalApiClient(
       config.INTERNAL_CONTROL_ORIGIN,
       config.INTERNAL_API_TOKEN_BASE64,
@@ -101,6 +104,7 @@ export function composeWorkerServices() {
   const pool = createPool(config.DATABASE_URL);
   const clock = new SystemClock();
   const diagnosticRepository = new PostgresDiagnosticRepository(pool);
+  const telemetryRepository = new PostgresTelemetryRepository(pool);
   const control = new InternalApiClient(
     config.INTERNAL_CONTROL_ORIGIN,
     config.INTERNAL_WORKER_TOKEN_BASE64,
@@ -110,6 +114,7 @@ export function composeWorkerServices() {
     pool,
     clock,
     diagnosticService: composeDiagnosticService(config, diagnosticRepository, clock, null),
+    telemetryRepository,
     control,
     operationalSync: new OperationalSyncService(
       clock,

@@ -8,10 +8,13 @@
 - Backblaze application credentials and private diagnostic objects.
 - GitHub/VPS/Doppler deployment authority.
 - Macro-user privacy, bandwidth, and local runtime safety.
+- Pseudonymous telemetry events and aggregate operational statistics.
 
 ## Trust boundaries
 
 Internet clients, Discord interactions, OAuth callbacks, GitHub APIs, Cloudflare headers, Backblaze callbacks/responses, database content, archive metadata, and every administrative field are untrusted. Only the dedicated `cloudflared` container address is a trusted proxy peer. The application accepts one syntactically valid `CF-Connecting-IP` value from that exact peer and ignores forwarding headers from every other source; `X-Forwarded-For` never owns rate-limit or diagnostic network identity.
+
+Telemetry bodies are untrusted even when their installation UUID is syntactically valid. Dual application/database validation rejects unknown fields, free-form paths or log text, stale/future timestamps, oversized batches, and out-of-range numbers. Separate monthly rotating telemetry-install and telemetry-network HMAC pseudonyms reach storage; the latter owns only a bounded daily event/byte quota. Public telemetry has no genuine-client proof, so quotas contain storage/availability exposure but do not make aggregates trustworthy. Telemetry never authorizes control or diagnostics, and the control/worker database roles cannot read its table.
 
 ## Principal threats and controls
 

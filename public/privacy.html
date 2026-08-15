@@ -11,29 +11,92 @@
       <a class="brand" href="/"><span class="brand-mark">L</span>LilacMacro</a>
     </header>
     <main class="document">
-      <div class="eyebrow">PRIVACY</div>
-      <h1>Diagnostics are optional and temporary.</h1>
+      <div class="eyebrow">PRIVACY / NOTICE 01</div>
+      <h1>Your choices control what leaves the app.</h1>
       <p>
-        LilacMacro works locally without uploading captures or logs. A diagnostic archive is
-        uploaded only after you explicitly choose to send it.
+        LilacMacro performs its automation locally. Before the first macro session, the app shows
+        three separate choices. Online features and product telemetry are initially shown on;
+        automatic error reports are initially off. Nothing covered by those choices is sent until
+        you save the screen, and every choice can be changed later in Settings.
       </p>
-      <h2>What is retained</h2>
+      <h2>Online features</h2>
       <p>
-        The service stores archive metadata, an opaque random object key, application version,
-        declared size and checksum, and rotating abuse-prevention pseudonyms. It does not store raw
-        IP addresses or hardware identifiers.
+        When enabled, LilacMacro requests signed service status, public game codes, remote safety
+        disables for known bugs or maintenance, and official GitHub release metadata. It can also
+        use service-backed configuration sharing when that feature is available. Turning this off
+        prevents new LilacMacro service and update-check requests. One bounded request already in
+        flight can finish and update its local public cache. Local automation remains available, but
+        it will not receive current maintenance or safety status.
       </p>
-      <h2>Retention</h2>
+      <h2>Product telemetry</h2>
       <p>
-        Routine archives expire after 72 hours. Archives over 3 GiB require a manual upload and
-        administrator acceptance within 30 minutes. Accepted archives can be extended for at most
-        seven days.
+        When enabled, the app sends a fixed, bounded event schema: app version; feature and outcome
+        identifiers; expedition material and quantity observations; error-state counters without
+        free-form exception text; OCR duration and CPU/GPU execution category; Windows version;
+        logical processor count; and process capability. Telemetry never includes screenshots, OCR
+        text, file paths, Roblox credentials, private-server links, Discord webhook URLs, raw
+        hardware identifiers, or raw IP addresses.
       </p>
-      <h2>Private storage</h2>
       <p>
-        Archives remain in private object storage, are downloaded only for debugging, and are never
-        automatically extracted or served as public content.
+        A random installation UUID is created locally. The service immediately converts it and the
+        normalized source network to separate rotating HMAC pseudonyms and stores no raw UUID or IP
+        address. The network pseudonym is used only for a daily abuse quota. Pseudonyms rotate
+        monthly using domains separate from diagnostic reports. Telemetry is used to estimate active
+        installations, understand feature use and error-prone states, tune OCR performance, and
+        inform manually reviewed expedition reward research. It is retained for no more than 90
+        days. Aggregates never automatically change macro behavior, reward distributions, or remote
+        control policy.
+      </p>
+      <h2>Automatic error reports</h2>
+      <p>
+        Automatic reports are a separate opt-in and are off initially. With Deep Debug off, an error
+        can create a temporary light report containing a sanitized event timeline, non-secret
+        display and plan counts, coarse device information, model/profile identifiers, macro
+        actions, and at most 32 already-acquired important frames. The archive has an 80 MiB hard
+        limit. OCR text, free-form exception text, paths, private-server links, Discord data, and
+        credentials are excluded, but Roblox pixels can still contain personal game data.
+      </p>
+      <p>
+        With Deep Debug active, the completed Deep Debug archive is sent instead. Temporary light
+        files are removed after the upload attempt. A successfully sent Deep Debug archive is
+        removed; a failed Deep Debug upload remains local so you can inspect or retry it. When
+        automatic reports are off, the app neither creates a light report nor automatically sends or
+        deletes your Deep Debug archives.
+      </p>
+      <h2>Manual diagnostic uploads</h2>
+      <p>
+        Settings also offers a separate manual upload control. It remains off until enabled and
+        always requires you to choose a specific ZIP. Routine archives expire after 72 hours.
+        Archives over 3 GiB require a short-lived administrator grant and can be retained for at
+        most seven days after explicit acceptance. Archives stay in private object storage and are
+        never served as public content.
+      </p>
+      <h2>Service records and providers</h2>
+      <p>
+        The service keeps bounded request metadata, object keys, checksums, application versions,
+        and rotating abuse-prevention pseudonyms. It does not store raw IP addresses. Hosting and
+        delivery may involve Hetzner infrastructure, Cloudflare networking, PostgreSQL storage,
+        Backblaze B2 private object storage, GitHub Releases, and Discord authentication for the
+        administrator console. Those providers process limited service data under their own terms.
+      </p>
+      <h2>Local data and control</h2>
+      <p>
+        Settings, plans, visual profiles, local logs, and Deep Debug archives remain on the Windows
+        device unless a feature described above sends them. Uninstalling does not silently erase
+        user-created datasets or retained diagnostics. Use ordinary Windows file management to
+        remove local data. To ask about server-held data, open a repository issue without including
+        personal data and request a private contact channel.
+      </p>
+      <p>
+        This notice describes the implemented product behavior; it is not a substitute for legal
+        advice. Last updated: August 15, 2026.
       </p>
     </main>
+    <footer>
+      <a href="/">Overview</a>
+      <a href="/terms">Terms</a>
+      <a href="https://github.com/LeniLilac/LilacMacro">Source</a>
+      <a href="/downloads">Download</a>
+    </footer>
   </body>
 </html>

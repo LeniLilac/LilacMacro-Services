@@ -27,7 +27,10 @@ The existing VPS host and unprivileged deploy identity are recorded only in `.lo
 
 - Only the fixed `cloudflared` edge-network address is trusted. Direct loopback requests and user-supplied `X-Forwarded-For` or `CF-Connecting-IP` values cannot select a rate-limit or diagnostic pseudonym.
 - Public assets cache for one hour and may be served stale for one day during an origin error. Public HTML caches for five minutes. Signed control snapshots cache for 30 seconds with a five-minute stale-on-error window.
-- OAuth, administration, diagnostics, internal APIs, and health endpoints always return `no-store`.
+- OAuth, administration, telemetry ingestion, diagnostics, internal APIs, and health endpoints always return `no-store`.
+
+Telemetry is retained for at most 90 days. The worker deletes up to 10,000 expired rows during each maintenance loop, which bounds each transaction while exceeding the 100,000-event global daily admission budget over a day of normal worker operation. Admission also caps serialized request bytes at 64 MiB globally per UTC day and uses telemetry-specific rotating network pseudonyms to cap each network at 2,048 events and 4 MiB per day. Verify the cleanup log remains clear and query the authenticated 30-day aggregate view from the control desk. The public API role can insert bounded rows and call the bounded aggregate function, but cannot read or delete raw telemetry. Never export installation or network pseudonyms or join them to diagnostic metadata. Telemetry uses HMAC domains separate from diagnostics and rotates monthly, so active-installation counts spanning a month boundary are estimates rather than stable-user counts. Public telemetry has no genuine-client proof and must be treated as forgeable and deniable: review sample size, anomalies, and statistical evidence manually, and never automatically feed telemetry into bundled reward distributions or signed control policy.
+
 - Keep Cloudflare Always Online disabled for the API origin because it overrides documented stale behavior.
 
 ## Secrets

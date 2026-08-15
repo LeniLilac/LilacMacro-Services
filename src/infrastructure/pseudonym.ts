@@ -26,8 +26,16 @@ export class RotatingPseudonymizer {
     return digest(this.installKey, this.epoch(now), 'install', installId.toLowerCase());
   }
 
+  public forTelemetryInstall(installId: string, now: Date): string {
+    return digest(this.installKey, this.epoch(now), 'telemetry-install', installId.toLowerCase());
+  }
+
   public forNetwork(address: string, now: Date): string {
     return digest(this.networkKey, this.epoch(now), 'network', normalizeAddress(address));
+  }
+
+  public forTelemetryNetwork(address: string, now: Date): string {
+    return digest(this.networkKey, this.epoch(now), 'telemetry-network', normalizeAddress(address));
   }
 
   private epoch(now: Date): string {

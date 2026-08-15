@@ -1,6 +1,6 @@
 # LilacMacro Services
 
-Private service repository for the LilacMacro public website, Discord application, signed control-plane API, and opt-in diagnostic-upload lifecycle.
+Private service repository for the LilacMacro public website, Discord application, signed control-plane API, bounded product telemetry, and opt-in diagnostic-upload lifecycle.
 
 The Windows macro remains in the separate LilacMacro repository. This service never supplies executable automation or installer content; downloads resolve directly to official GitHub Releases.
 

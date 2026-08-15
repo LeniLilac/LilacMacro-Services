@@ -6,6 +6,7 @@ import type {
   UploadStatus,
 } from '../contracts/diagnostics.js';
 import type { MutableControlState } from './control-state.js';
+import type { TelemetryEvent, TelemetryKind } from '../contracts/telemetry.js';
 
 export interface Actor {
   kind: 'discord' | 'web' | 'system';
@@ -146,4 +147,34 @@ export interface DiagnosticRepository {
   scheduleVerificationRetry(id: string, nextAttemptAt: Date): Promise<boolean>;
   claimExpired(now: Date, limit: number): Promise<DiagnosticUploadRecord[]>;
   listProviderUploadIds(): Promise<readonly string[]>;
+}
+
+export type PersistedTelemetryEvent = TelemetryEvent extends infer Event
+  ? Event extends TelemetryEvent
+    ? Omit<Event, 'occurredAtUtc'> & { occurredAtUtc: Date }
+    : never
+  : never;
+
+export interface TelemetrySummaryRow {
+  kind: TelemetryKind;
+  feature: string | null;
+  material: string | null;
+  eventCount: number;
+  estimatedInstallations: number;
+  averageDurationMilliseconds: number | null;
+  quantityTotal: number | null;
+}
+
+export interface TelemetryRepository {
+  insertBatch(
+    installPseudonym: string,
+    networkPseudonym: string,
+    appVersion: string,
+    privacyNoticeVersion: number,
+    events: readonly PersistedTelemetryEvent[],
+    receivedAt: Date,
+    requestBytes: number,
+  ): Promise<boolean>;
+  summary(since: Date): Promise<readonly TelemetrySummaryRow[]>;
+  deleteBefore(cutoff: Date): Promise<number>;
 }

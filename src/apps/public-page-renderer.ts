@@ -12,29 +12,18 @@ export function renderPublicHome(
   minimumRevision: number,
 ): string {
   let downloadUrl = releasesFallback;
-  let status = 'Status temporarily unavailable · macro uses signed last-known-good data';
-  let statusState: 'available' | 'unavailable' | 'unknown' = 'unknown';
 
   try {
     if (!snapshot) throw new Error('Control snapshot was unavailable.');
     const verified = parseVerifyAndValidateSnapshot(snapshot, publicKeys, now, minimumRevision);
     downloadUrl = verified.payload.release?.installerUrl ?? releasesFallback;
-    if (verified.payload.game.available) {
-      status = 'Game available · signed status current';
-      statusState = 'available';
-    } else {
-      status = verified.payload.game.message ?? 'Game maintenance in progress';
-      statusState = 'unavailable';
-    }
   } catch {
     // The public page must remain useful without trusting stale or malformed control data.
   }
 
   return template
     .replaceAll('__LILAC_DOWNLOAD_URL__', escapeAttribute(downloadUrl))
-    .replaceAll('__LILAC_DISCORD_INSTALL_URL__', discordInstallUrl(discordClientId))
-    .replaceAll('__LILAC_STATUS_TEXT__', escapeText(status))
-    .replaceAll('__LILAC_STATUS_STATE__', statusState);
+    .replaceAll('__LILAC_DISCORD_INSTALL_URL__', discordInstallUrl(discordClientId));
 }
 
 function discordInstallUrl(clientId: string): string {

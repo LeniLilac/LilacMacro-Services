@@ -15,7 +15,7 @@ import {
 } from '../contracts/diagnostics.js';
 import type { Clock } from '../domain/clock.js';
 import { checksumHeaderValue, type DiagnosticService } from '../domain/diagnostic-service.js';
-import type { ControlRepository } from '../domain/ports.js';
+import type { ControlRepository, TelemetryRepository } from '../domain/ports.js';
 import type { PostgresAuthStore } from '../infrastructure/auth-store.js';
 import type { ApiServiceConfig } from '../infrastructure/config.js';
 import type { RotatingPseudonymizer } from '../infrastructure/pseudonym.js';
@@ -25,7 +25,8 @@ import { parseVerifyAndValidateSnapshot } from '../infrastructure/snapshot-signe
 import { TrustedProxyAddressResolver } from '../infrastructure/trusted-proxy.js';
 import { authorizeAdmin, csrfFor, registerAuthRoutes } from './auth-routes.js';
 import { registerDiagnosticInternalRoutes } from './internal-routes.js';
-import { renderPublicHome } from './public-page-renderer.js';
+import { registerPublicRoutes } from './public-routes.js';
+import { registerTelemetryRoutes } from './telemetry-routes.js';
 
 const completionSchema = z
   .object({
@@ -75,13 +76,11 @@ export interface ApiDependencies {
   diagnosticService: DiagnosticService;
   pseudonymizer: RotatingPseudonymizer;
   largeUploadAuthorizer: HmacLargeUploadAuthorizer;
+  telemetryRepository: TelemetryRepository;
 }
 
 export async function buildApi(dependencies: ApiDependencies): Promise<FastifyInstance> {
   const publicRoot = path.resolve('dist/public');
-  const publicHomeTemplate = await (
-    await import('node:fs/promises')
-  ).readFile(path.join(publicRoot, 'index.html'), 'utf8');
   const clientAddresses = new TrustedProxyAddressResolver(dependencies.config.trustedProxyCidrs);
   const app = Fastify({
     logger: {
@@ -140,13 +139,19 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       requestPath.startsWith('/admin') ||
       requestPath.startsWith('/internal/') ||
       requestPath.startsWith('/health/') ||
-      requestPath.startsWith('/v1/diagnostics/')
+      requestPath.startsWith('/v1/diagnostics/') ||
+      requestPath.startsWith('/v1/telemetry/')
     ) {
       reply.header('cache-control', 'no-store');
       reply.header('pragma', 'no-cache');
     } else if (requestPath.startsWith('/assets/')) {
       reply.header('cache-control', 'public, max-age=3600, stale-if-error=86400');
-    } else if (requestPath === '/' || requestPath === '/privacy') {
+    } else if (
+      requestPath === '/' ||
+      requestPath === '/downloads' ||
+      requestPath === '/privacy' ||
+      requestPath === '/terms'
+    ) {
       reply.header('cache-control', 'public, max-age=300, stale-if-error=3600');
     }
     return payload;
@@ -164,34 +169,7 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     return reply.code(statusFor(error)).send({ error: message });
   });
 
-  const publicKeys = {
-    [dependencies.config.CONTROL_SIGNING_KEY_ID]:
-      dependencies.config.CONTROL_SIGNING_PUBLIC_KEY_BASE64,
-  };
-  const renderHome = (snapshot: Parameters<typeof renderPublicHome>[1], revision: number) =>
-    renderPublicHome(
-      publicHomeTemplate,
-      snapshot,
-      publicKeys,
-      dependencies.config.DISCORD_BOT_CLIENT_ID,
-      dependencies.clock.now(),
-      revision,
-    );
-
-  app.get('/', async (_request, reply) => {
-    try {
-      const [state, snapshot] = await Promise.all([
-        dependencies.controlRepository.readState(),
-        dependencies.controlRepository.readPublished(),
-      ]);
-      return reply.type('text/html').send(renderHome(snapshot, state.revision));
-    } catch {
-      return reply.type('text/html').send(renderHome(null, 0));
-    }
-  });
-  app.get('/privacy', async (_request, reply) =>
-    reply.type('text/html').sendFile('privacy.html', publicRoot),
-  );
+  await registerPublicRoutes(app, dependencies, publicRoot);
   app.get('/health/live', async () => ({ status: 'live' }));
   app.get('/health/ready', async (_request, reply) => {
     try {
@@ -234,6 +212,7 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
   await registerAuthRoutes(app, { config: dependencies.config, store: dependencies.authStore });
   registerAdminRoutes(app, dependencies);
   registerDiagnosticRoutes(app, dependencies, clientAddresses);
+  registerTelemetryRoutes(app, dependencies, clientAddresses);
   registerDiagnosticInternalRoutes(app, dependencies);
   return app;
 }

@@ -264,6 +264,29 @@ async function loadAudit() {
   if (!rows.length) renderEmptyRow('#audit-rows', 4, 'No administrative actions yet.');
 }
 
+async function loadTelemetry() {
+  const telemetry = await request('/admin/api/telemetry/summary?days=30');
+  const rows = telemetry.rows.map((record) => {
+    const row = document.createElement('tr');
+    row.append(
+      cell(record.kind),
+      cell(record.feature || '—'),
+      cell(record.material || '—'),
+      cell(String(record.eventCount)),
+      cell(String(record.estimatedInstallations)),
+      cell(
+        record.averageDurationMilliseconds === null
+          ? '—'
+          : record.averageDurationMilliseconds.toFixed(1),
+      ),
+      cell(record.quantityTotal === null ? '—' : String(record.quantityTotal)),
+    );
+    return row;
+  });
+  document.querySelector('#telemetry-rows').replaceChildren(...rows);
+  if (!rows.length) renderEmptyRow('#telemetry-rows', 7, 'No telemetry in this window.');
+}
+
 function actionButton(label, action, destructive = false) {
   const button = document.createElement('button');
   button.className = `button small${destructive ? ' warning' : ''}`;
@@ -401,12 +424,14 @@ document.querySelector('#large-upload-form').onsubmit = (event) => {
 document.querySelector('#copy-large-upload-grant').onclick = () => void copyLargeUploadGrant();
 document.querySelector('#refresh-audit').onclick = () =>
   void loadAudit().catch((error) => notice(error.message, true));
+document.querySelector('#refresh-telemetry').onclick = () =>
+  void loadTelemetry().catch((error) => notice(error.message, true));
 document.querySelector('#logout').onclick = async () => {
   await request('/auth/logout', { method: 'POST' });
   location.href = '/';
 };
 
 document.querySelector('#schedule-form [name="cadenceSeconds"]').value = 86400;
-void Promise.all([loadState(), loadDiagnostics(), loadAudit()]).catch((error) =>
+void Promise.all([loadState(), loadDiagnostics(), loadTelemetry(), loadAudit()]).catch((error) =>
   notice(error.message, true),
 );

@@ -169,34 +169,6 @@ h2 {
   gap: 18px;
   flex-wrap: wrap;
 }
-.status-strip {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: fit-content;
-  margin-top: 56px;
-  padding: 13px 18px;
-  border: 2px solid var(--ink);
-  background: #fff;
-  font:
-    13px ui-monospace,
-    monospace;
-}
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--mint);
-  box-shadow: 0 0 0 4px #45d7b033;
-}
-.status-strip[data-state='unavailable'] .status-dot {
-  background: var(--coral);
-  box-shadow: 0 0 0 4px #ff6b6b33;
-}
-.status-strip[data-state='unknown'] .status-dot {
-  background: var(--gold);
-  box-shadow: 0 0 0 4px #f2b44133;
-}
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

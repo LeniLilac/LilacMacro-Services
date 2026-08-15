@@ -11,6 +11,7 @@ import {
   MemoryControlRepository,
   MemoryDiagnosticRepository,
 } from '../src/infrastructure/memory-repositories.js';
+import { MemoryTelemetryRepository } from '../src/infrastructure/memory-telemetry-repository.js';
 import { RotatingPseudonymizer } from '../src/infrastructure/pseudonym.js';
 import { TrustedProxyAddressResolver } from '../src/infrastructure/trusted-proxy.js';
 import { Ed25519SnapshotSigner } from '../src/infrastructure/snapshot-signer.js';
@@ -103,6 +104,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     config.CONTROL_SIGNING_KEY_ID,
   );
   const diagnosticRepository = new MemoryDiagnosticRepository();
+  const telemetryRepository = new MemoryTelemetryRepository(1);
   const commandService = new CommandService(controlRepository, signer, clock);
   const storage = new ApiStorage();
   const diagnosticService = new DiagnosticService(
@@ -125,6 +127,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     },
     clock,
     diagnosticService,
+    telemetryRepository,
     pseudonymizer: new RotatingPseudonymizer(
       config.INSTALL_PSEUDONYM_HMAC_KEY_BASE64,
       config.NETWORK_PSEUDONYM_HMAC_KEY_BASE64,
@@ -137,8 +140,29 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(landing.statusCode, 200);
     assert.match(landing.headers['cache-control'] ?? '', /max-age=300/);
     assert.match(landing.body, /class="product-figure hero-product"/);
+    assert.match(landing.body, /href="\/downloads"/);
+    assert.doesNotMatch(landing.body, /__LILAC_DOWNLOAD_URL__/);
     assert.match(landing.body, /landing\.css\?v=firefox-mobile-1/);
-    assert.match(landing.body, /site\.js\?v=firefox-mobile-1/);
+    assert.doesNotMatch(landing.body, /site\.js/);
+    for (const removedCopy of [
+      'Roblox, the plan, runtime history, and upcoming work stay in view.',
+      'Game available',
+      'LilacMacro is a free passion project.',
+      'WINDOWS · FREE · OPEN SOURCE',
+      'Shared or separate configuration, with resolution controlled per instance.',
+      'Bundled map views keep placement setup available in every local session.',
+      'MAP LIBRARY',
+      'PLACEMENT AUTHORING',
+      'Author placements directly over the map',
+      'Configure each task where it runs.',
+      'Priority order is explicit. Every committed edit persists.',
+      'Order matches, utilities, loops, and reset schedules without hiding the sequence.',
+    ]) {
+      assert.doesNotMatch(
+        landing.body,
+        new RegExp(removedCopy.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
+    }
     assert.doesNotMatch(landing.body, /loading="lazy"/);
     assert.doesNotMatch(landing.body, /id="setup"|id="safety"/);
     const landingCss = await app.inject({ method: 'GET', url: '/assets/landing.css' });
@@ -147,12 +171,125 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.match(landingCss.body, /min-width: 0/);
     assert.doesNotMatch(landingCss.body, /min-width: 720px/);
     assert.doesNotMatch(landingCss.body, /\[data-reveal\]\.is-visible/);
+    const downloads = await app.inject({ method: 'GET', url: '/downloads' });
+    assert.equal(downloads.statusCode, 200);
+    assert.match(downloads.headers['cache-control'] ?? '', /max-age=300/);
+    assert.match(downloads.body, /Your run starts/);
+    assert.match(downloads.body, /Minimum/);
+    assert.match(downloads.body, /Recommended/);
+    assert.match(downloads.body, /Windows 10 1903\+/);
+    assert.match(downloads.body, /NVIDIA GPU, compute capability 6\.0\+/);
+    assert.match(downloads.body, /INSTALL WALKTHROUGH/);
+    assert.match(downloads.body, /FIRST PLAN &amp; SETUP/);
+    assert.match(downloads.body, /releases\/latest/);
+    assert.doesNotMatch(downloads.body, /__LILAC_DOWNLOAD_URL__/);
+    const downloadsCss = await app.inject({ method: 'GET', url: '/assets/downloads.css' });
+    assert.equal(downloadsCss.statusCode, 200);
+    assert.match(downloadsCss.body, /@media \(max-width: 620px\)/);
+    assert.match(downloadsCss.body, /grid-template-columns: minmax\(0, 1fr\)/);
+    const privacy = await app.inject({ method: 'GET', url: '/privacy' });
+    assert.equal(privacy.statusCode, 200);
+    assert.match(privacy.body, /PRODUCT TELEMETRY/i);
+    assert.match(privacy.body, /at most 32/);
+    assert.match(privacy.body, /80 MiB/);
+    assert.match(privacy.body, /90\s+days/);
+    const terms = await app.inject({ method: 'GET', url: '/terms' });
+    assert.equal(terms.statusCode, 200);
+    assert.match(terms.body, /Use LilacMacro carefully and lawfully/);
+    assert.match(terms.headers['cache-control'] ?? '', /max-age=300/);
     const health = await app.inject({ method: 'GET', url: '/health/live' });
     assert.equal(health.statusCode, 200);
     assert.equal(health.headers['cache-control'], 'no-store');
     assert.equal((await app.inject({ method: 'GET', url: '/health/ready' })).statusCode, 503);
     const initializing = await app.inject({ method: 'GET', url: '/v1/control' });
     assert.equal(initializing.statusCode, 503);
+
+    const telemetryInstallId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const telemetry = await app.inject({
+      method: 'POST',
+      url: '/v1/telemetry/events',
+      payload: {
+        installId: telemetryInstallId,
+        appVersion: '1.2.3',
+        privacyNoticeVersion: 1,
+        events: [
+          {
+            kind: 'ocr-timing',
+            occurredAtUtc: '2026-08-14T11:59:30.000Z',
+            feature: 'ocr',
+            outcome: 'completed',
+            durationMilliseconds: 42,
+            graphicsCapability: 'gpu',
+          },
+        ],
+      },
+    });
+    assert.equal(telemetry.statusCode, 202);
+    assert.equal(telemetry.headers['cache-control'], 'no-store');
+    assert.deepEqual(telemetry.json(), { accepted: 1 });
+    assert.equal(telemetryRepository.events.length, 1);
+    assert.notEqual(telemetryRepository.events[0]?.installPseudonym, telemetryInstallId);
+    assert.equal(
+      telemetryRepository.events[0] && 'durationMilliseconds' in telemetryRepository.events[0]
+        ? telemetryRepository.events[0].durationMilliseconds
+        : null,
+      42,
+    );
+    const unsafeTelemetry = await app.inject({
+      method: 'POST',
+      url: '/v1/telemetry/events',
+      payload: {
+        installId: telemetryInstallId,
+        appVersion: '1.2.3',
+        privacyNoticeVersion: 1,
+        events: [
+          {
+            kind: 'operation-error',
+            occurredAtUtc: '2026-08-14T11:59:30.000Z',
+            feature: 'C:\\Users\\name\\secret.txt',
+          },
+        ],
+      },
+    });
+    assert.equal(unsafeTelemetry.statusCode, 400);
+    const poisonedTelemetry = await app.inject({
+      method: 'POST',
+      url: '/v1/telemetry/events',
+      payload: {
+        installId: telemetryInstallId,
+        appVersion: '1.2.3',
+        privacyNoticeVersion: 1,
+        events: [
+          {
+            kind: 'expedition-reward-observed',
+            occurredAtUtc: '2026-08-14T11:59:30.000Z',
+            feature: 'route-optimizer',
+            outcome: 'observed',
+            material: 'AttackerControlledMaterial',
+            quantity: 1,
+          },
+        ],
+      },
+    });
+    assert.equal(poisonedTelemetry.statusCode, 400);
+    const capacityLimitedTelemetry = await app.inject({
+      method: 'POST',
+      url: '/v1/telemetry/events',
+      payload: {
+        installId: telemetryInstallId,
+        appVersion: '1.2.3',
+        privacyNoticeVersion: 1,
+        events: [
+          {
+            kind: 'feature-used',
+            occurredAtUtc: '2026-08-14T11:59:30.000Z',
+            feature: 'workspace',
+            outcome: 'completed',
+          },
+        ],
+      },
+    });
+    assert.equal(capacityLimitedTelemetry.statusCode, 429);
     assert.equal(initializing.headers['retry-after'], '30');
     assert.equal((await app.inject({ method: 'GET', url: '/admin/api/state' })).statusCode, 401);
 
@@ -173,6 +310,15 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.match(adminPage.body, /action="\/admin\/api\/diagnostics\/large-upload-grants"/);
     assert.match(adminPage.body, /autocomplete="off"/);
     assert.match(adminPage.body, /Exact archive size \(bytes\)/);
+    assert.match(adminPage.body, /id="telemetry"/);
+    const telemetrySummary = await app.inject({
+      method: 'GET',
+      url: '/admin/api/telemetry/summary?days=30',
+      headers: { cookie },
+    });
+    assert.equal(telemetrySummary.statusCode, 200);
+    assert.equal(telemetrySummary.json().rows[0].kind, 'ocr-timing');
+    assert.equal(telemetrySummary.json().rows[0].estimatedInstallations, 1);
 
     const command = {
       commandId: randomUUID(),

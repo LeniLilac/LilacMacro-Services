@@ -4,6 +4,7 @@ import { after, before, test } from 'node:test';
 import type { Pool } from 'pg';
 import { multipartPartBytes } from '../src/contracts/diagnostics.js';
 import { Ed25519SnapshotSigner } from '../src/infrastructure/snapshot-signer.js';
+import { PostgresTelemetryRepository } from '../src/infrastructure/postgres-telemetry-repository.js';
 import {
   PostgresControlRepository,
   PostgresDiagnosticRepository,
@@ -300,6 +301,12 @@ test('Postgres runtime roles enforce the control and diagnostic authority split'
   const worker = createPool(runtimeRoleUrl('lilacmacro_worker'));
   try {
     assert.equal((await api.query('SELECT revision FROM control_state')).rowCount, 1);
+    await assert.rejects(api.query('SELECT id FROM telemetry_events'));
+    assert.ok(
+      (await api.query("SELECT * FROM telemetry_summary(now() - interval '30 days')")).rowCount !==
+        null,
+    );
+    await assert.rejects(api.query('DELETE FROM telemetry_events'));
     await assert.rejects(api.query('UPDATE control_state SET updated_at = updated_at'));
     await assert.rejects(api.query('INSERT INTO control_commands DEFAULT VALUES'));
 
@@ -308,14 +315,134 @@ test('Postgres runtime roles enforce the control and diagnostic authority split'
       1,
     );
     await assert.rejects(control.query('SELECT * FROM diagnostic_uploads'));
+    await assert.rejects(control.query('SELECT * FROM telemetry_events'));
     await assert.rejects(control.query('DELETE FROM control_commands'));
 
     assert.ok(((await worker.query('SELECT id FROM diagnostic_uploads')).rowCount ?? 0) >= 1);
     await assert.rejects(worker.query('SELECT * FROM diagnostic_large_upload_grants'));
     await assert.rejects(worker.query('SELECT revision FROM control_state'));
+    await assert.rejects(worker.query('SELECT * FROM telemetry_events'));
+    await assert.rejects(worker.query('DELETE FROM telemetry_events'));
+    assert.equal(
+      (
+        await worker.query<{ deleted: number }>(
+          "SELECT telemetry_delete_before(now() - interval '90 days') AS deleted",
+        )
+      ).rows[0]?.deleted,
+      0,
+    );
     await assert.rejects(worker.query('DELETE FROM diagnostic_uploads'));
   } finally {
     await Promise.all([api.end(), control.end(), worker.end()]);
+  }
+});
+
+test('Postgres telemetry repository stores fixed pseudonymous events, summarizes, and expires them', async () => {
+  const repository = new PostgresTelemetryRepository(pool);
+  const now = new Date('2026-08-14T14:00:00.000Z');
+  const pseudonym = 'p'.repeat(43);
+  await repository.insertBatch(
+    pseudonym,
+    'n'.repeat(43),
+    '1.2.3',
+    1,
+    [
+      {
+        kind: 'ocr-timing',
+        occurredAtUtc: new Date('2026-08-14T13:59:30.000Z'),
+        feature: 'ocr',
+        outcome: 'completed',
+        durationMilliseconds: 40,
+        graphicsCapability: 'gpu:0',
+      },
+    ],
+    now,
+    512,
+  );
+
+  const rows = await repository.summary(new Date('2026-08-14T00:00:00.000Z'));
+  const ocr = rows.find((row) => row.kind === 'ocr-timing');
+  assert.equal(ocr?.eventCount, 1);
+  assert.equal(ocr?.estimatedInstallations, 1);
+  assert.equal(ocr?.averageDurationMilliseconds, 40);
+  assert.equal(
+    (
+      await pool.query('SELECT install_pseudonym FROM telemetry_events WHERE kind = $1', [
+        'ocr-timing',
+      ])
+    ).rows[0]?.install_pseudonym,
+    pseudonym,
+  );
+  await repository.insertBatch(
+    pseudonym,
+    'n'.repeat(43),
+    '1.2.3',
+    1,
+    [
+      {
+        kind: 'feature-used',
+        occurredAtUtc: new Date('2026-04-14T13:59:30.000Z'),
+        feature: 'workspace',
+        outcome: 'completed',
+      },
+    ],
+    new Date('2026-04-14T14:00:00.000Z'),
+    512,
+  );
+  assert.equal(await repository.deleteBefore(new Date('2026-08-15T00:00:00.000Z')), 1);
+});
+
+test('Postgres telemetry admission applies independent network event and byte budgets', async () => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (let index = 0; index < 32; index += 1) {
+      assert.equal(
+        (
+          await client.query<{ reserved: boolean }>(
+            'SELECT telemetry_reserve_capacity($1, $2, $3) AS reserved',
+            ['e'.repeat(43), 64, 512],
+          )
+        ).rows[0]?.reserved,
+        true,
+      );
+    }
+    assert.equal(
+      (
+        await client.query<{ reserved: boolean }>(
+          'SELECT telemetry_reserve_capacity($1, $2, $3) AS reserved',
+          ['e'.repeat(43), 1, 512],
+        )
+      ).rows[0]?.reserved,
+      false,
+    );
+    await client.query('ROLLBACK');
+
+    await client.query('BEGIN');
+    for (let index = 0; index < 64; index += 1) {
+      assert.equal(
+        (
+          await client.query<{ reserved: boolean }>(
+            'SELECT telemetry_reserve_capacity($1, $2, $3) AS reserved',
+            ['b'.repeat(43), 1, 65_536],
+          )
+        ).rows[0]?.reserved,
+        true,
+      );
+    }
+    assert.equal(
+      (
+        await client.query<{ reserved: boolean }>(
+          'SELECT telemetry_reserve_capacity($1, $2, $3) AS reserved',
+          ['b'.repeat(43), 1, 1],
+        )
+      ).rows[0]?.reserved,
+      false,
+    );
+    await client.query('ROLLBACK');
+  } finally {
+    await client.query('ROLLBACK').catch(() => undefined);
+    client.release();
   }
 });
 

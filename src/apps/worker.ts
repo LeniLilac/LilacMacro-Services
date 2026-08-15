@@ -44,6 +44,18 @@ async function diagnosticLoop(): Promise<void> {
     }
     if (controller.signal.aborted) break;
     try {
+      const expiredTelemetry = await services.telemetryRepository.deleteBefore(
+        new Date(Date.now() - 90 * 24 * 60 * 60 * 1_000),
+      );
+      if (expiredTelemetry) {
+        console.log(JSON.stringify({ event: 'telemetry_cleanup', removed: expiredTelemetry }));
+      }
+    } catch (error) {
+      succeeded = false;
+      logError('telemetry_cleanup_error', error);
+    }
+    if (controller.signal.aborted) break;
+    try {
       const aborted = await services.diagnosticService.reconcileMultipartOrphans(
         100,
         controller.signal,

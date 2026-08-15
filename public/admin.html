@@ -14,6 +14,7 @@
       <nav class="admin-nav" aria-label="Control desk">
         <a href="#overview">Overview</a><a href="#schedules">Schedules</a>
         <a href="#features">Features</a><a href="#diagnostics">Diagnostics</a>
+        <a href="#telemetry">Telemetry</a>
         <a href="#audit">Audit</a>
       </nav>
       <button class="button small" id="logout">Sign out</button>
@@ -178,6 +179,31 @@
                 </tr>
               </thead>
               <tbody id="diagnostic-rows"></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="panel panel-wide" id="telemetry">
+          <div class="panel-heading">
+            <div>
+              <h2>Product telemetry</h2>
+              <span>Last 30 days · rotating installation pseudonyms</span>
+            </div>
+            <button class="button small" id="refresh-telemetry" type="button">Refresh</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Feature</th>
+                  <th>Material</th>
+                  <th>Events</th>
+                  <th>Installations</th>
+                  <th>Avg. ms</th>
+                  <th>Quantity</th>
+                </tr>
+              </thead>
+              <tbody id="telemetry-rows"></tbody>
             </table>
           </div>
         </article>

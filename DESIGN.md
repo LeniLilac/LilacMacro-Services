@@ -6,10 +6,9 @@ The site and admin console extend LilacMacro's SquareClaim-inspired paper-and-in
 
 ## Public site
 
-- Lead with the product name, one-sentence purpose, direct GitHub Release download, and current operational state.
+- Lead with the product name and one-sentence purpose. Landing-page download actions route to a dedicated download page; that page presents the direct GitHub Release download, practical minimum/recommended Windows guidance, and concise install and quick-start walkthroughs. Keep live operational state in the signed control API and app rather than the landing-page composition.
 - Use short sections for capabilities, setup, privacy, open-source status, and links. Avoid marketing superlatives, fake metrics, testimonials, and oversized gradients.
-- Download links point directly to the verified GitHub Release asset.
-- Status and maintenance content remains readable without JavaScript.
+- The download page's installer actions point directly to the verified GitHub Release asset. Tutorial placeholders stay visibly labeled until real videos are published.
 
 ## Admin console
 
