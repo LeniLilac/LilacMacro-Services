@@ -137,7 +137,14 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(landing.statusCode, 200);
     assert.match(landing.headers['cache-control'] ?? '', /max-age=300/);
     assert.match(landing.body, /class="product-figure hero-product"/);
+    assert.doesNotMatch(landing.body, /loading="lazy"/);
     assert.doesNotMatch(landing.body, /id="setup"|id="safety"/);
+    const landingCss = await app.inject({ method: 'GET', url: '/assets/landing.css' });
+    assert.equal(landingCss.statusCode, 200);
+    assert.match(landingCss.body, /grid-template-columns: minmax\(0, 1fr\)/);
+    assert.match(landingCss.body, /min-width: 0/);
+    assert.doesNotMatch(landingCss.body, /min-width: 720px/);
+    assert.doesNotMatch(landingCss.body, /\[data-reveal\]\.is-visible/);
     const health = await app.inject({ method: 'GET', url: '/health/live' });
     assert.equal(health.statusCode, 200);
     assert.equal(health.headers['cache-control'], 'no-store');
