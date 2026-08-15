@@ -131,7 +131,10 @@ wait_for_health() {
 
 wait_for_unhealthy() {
   local service="$1"
-  local deadline=$((SECONDS + 90))
+  # The worker heartbeat remains valid for 45 seconds and Docker requires three
+  # failed 30-second health checks after the start period. Keep this deadline
+  # above that complete contract instead of racing the final failed probe.
+  local deadline=$((SECONDS + 130))
   while (( SECONDS < deadline )); do
     local id running health
     id="$("${compose[@]}" ps --all -q "${service}")"

@@ -36,3 +36,10 @@ test('runtime promotion verifies the signed control contract before public readi
     'signed control verification must pass before public promotion succeeds',
   );
 });
+
+test('staging allows the complete worker heartbeat failure window', async () => {
+  const staging = await readFile('ops/verify-staging.sh', 'utf8');
+
+  assert.match(staging, /local deadline=\$\(\(SECONDS \+ 130\)\)/);
+  assert.match(staging, /wait_for_unhealthy worker/);
+});
