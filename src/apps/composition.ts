@@ -46,7 +46,7 @@ export function composeApiServices() {
     diagnosticRepository,
     telemetryRepository,
     configurationShares,
-    configurationSharingEnabled: false,
+    configurationSharingEnabled: true,
     controlClient: new InternalApiClient(
       config.INTERNAL_CONTROL_ORIGIN,
       config.INTERNAL_API_TOKEN_BASE64,
