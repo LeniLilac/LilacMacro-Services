@@ -126,13 +126,45 @@
         </div>
         <figure class="product-figure sessions-figure" data-reveal>
           <div class="figure-label"><span>FIG 05</span><span>LOCAL INSTANCES</span></div>
-          <div class="product-frame">
-            <img
-              src="/assets/media/app-sessions.webp"
-              width="1600"
-              height="900"
-              alt="LilacMacro settings showing the desktop and three isolated local instances"
-            />
+          <div class="product-frame sessions-preview-frame">
+            <div
+              class="session-preview"
+              role="img"
+              aria-label="LilacMacro local sessions interface showing the current desktop and three isolated runners"
+            >
+              <div class="session-preview-bar">
+                <strong>SETTINGS</strong>
+                <span>THIS DESKTOP</span>
+              </div>
+              <div class="session-preview-tabs" aria-hidden="true">
+                <span>GENERAL</span><b>ROBLOX</b><span>DISCORD</span><span>KEYBINDS</span>
+              </div>
+              <div class="session-preview-panel">
+                <div class="session-preview-heading">
+                  <div>
+                    <strong>Local instances</strong
+                    ><small>3 local macro instances configured.</small>
+                  </div>
+                  <span>READY</span>
+                </div>
+                <div class="session-preview-row current">
+                  <strong>This desktop</strong><span>CURRENT UI</span><span>SHARED</span
+                  ><em>Run from this window</em>
+                </div>
+                <div class="session-preview-row">
+                  <strong>Runner 1</strong><span>DISCONNECTED</span><span>SHARED</span
+                  ><span class="session-preview-button">OPEN</span>
+                </div>
+                <div class="session-preview-row">
+                  <strong>Runner 2</strong><span>SIGNED OUT</span><span>SHARED</span
+                  ><span class="session-preview-button">OPEN</span>
+                </div>
+                <div class="session-preview-row">
+                  <strong>Runner 3</strong><span>SIGNED OUT</span><span>SEPARATE</span
+                  ><span class="session-preview-button">OPEN</span>
+                </div>
+              </div>
+            </div>
           </div>
         </figure>
       </section>
