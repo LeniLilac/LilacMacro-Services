@@ -4,26 +4,26 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content="__CSRF_TOKEN__" />
-    <title>Control desk · LilacMacro</title>
+    <title>Overview · LilacMacro Control Desk</title>
     <link rel="stylesheet" href="/assets/site.css" />
   </head>
   <body class="admin-body">
-    <header class="masthead">
-      <a class="brand" href="/"><span class="brand-mark">L</span>LilacMacro</a>
-      <strong>CONTROL DESK</strong>
+    <header class="masthead admin-masthead">
+      <a class="brand" href="/"><span class="brand-mark">L</span>LilacMacro</a
+      ><strong>CONTROL DESK</strong>
       <nav class="admin-nav" aria-label="Control desk">
-        <a href="#overview">Overview</a><a href="#schedules">Schedules</a>
-        <a href="#features">Features</a><a href="#diagnostics">Diagnostics</a>
-        <a href="#telemetry">Telemetry</a>
-        <a href="#audit">Audit</a>
+        <a aria-current="page" href="/admin">Overview</a><a href="/admin/codes">Codes</a
+        ><a href="/admin/schedules">Schedules</a><a href="/admin/features">Features</a
+        ><a href="/admin/diagnostics">Diagnostics</a><a href="/admin/telemetry">Telemetry</a
+        ><a href="/admin/audit">Audit</a><a href="/admin/api-keys">API keys</a>
       </nav>
       <button class="button small" id="logout">Sign out</button>
     </header>
-    <main class="admin-shell" id="overview">
+    <main class="admin-shell">
       <section class="admin-heading">
         <div>
           <div class="eyebrow">SIGNED CONTROL PLANE</div>
-          <h1>Runtime safety status</h1>
+          <h1>Runtime overview</h1>
         </div>
         <div class="revision">REVISION <strong id="revision">—</strong></div>
       </section>
@@ -38,206 +38,39 @@
                 <option value="true">Available</option>
                 <option value="false">In update / maintenance</option>
               </select></label
-            >
-            <label
+            ><label
               ><span>Public message</span
-              ><input name="message" maxlength="240" placeholder="Optional explanation"
-            /></label>
-            <button class="button primary" type="submit">Publish state</button>
+              ><input name="message" maxlength="240" placeholder="Optional explanation" /></label
+            ><button class="button primary" type="submit">Publish state</button>
           </form>
         </article>
         <article class="panel">
-          <h2>Redeem codes</h2>
-          <form id="code-form" class="stack-form">
-            <label
-              ><span>Code</span
-              ><input
-                name="code"
-                maxlength="64"
-                pattern="[A-Za-z0-9_-]+"
-                placeholder="NEWCODE"
-                required
-            /></label>
-            <label
-              ><span>Expires at (optional UTC)</span><input name="expiresAt" type="datetime-local"
-            /></label>
-            <button class="button primary" type="submit">Add code</button>
-          </form>
-          <div id="codes" class="item-list"></div>
-        </article>
-        <article class="panel panel-wide" id="schedules">
-          <div class="panel-heading">
-            <h2>UTC schedules</h2>
-            <span>Each next occurrence is also that shop's repeating cycle anchor</span>
-          </div>
-          <form id="schedule-form" class="schedule-form">
-            <label
-              ><span>Schedule</span
-              ><select name="key">
-                <option value="gold-shop-reset">Gold shop reset</option>
-                <option value="raid-shop-reset">Raid shop reset</option>
-                <option value="expedition-shop-reset">Expedition shop reset</option>
-              </select></label
-            >
-            <label
-              ><span>Next occurrence</span><input name="nextAt" type="datetime-local" required
-            /></label>
-            <label
-              ><span>Cadence seconds</span
-              ><input name="cadenceSeconds" type="number" min="1" max="31622400" required
-            /></label>
-            <button class="button primary" type="submit">Set schedule</button>
-          </form>
-          <div id="schedules-list" class="item-list"></div>
-        </article>
-        <article class="panel panel-wide" id="features">
-          <div class="panel-heading">
-            <h2>Feature safety</h2>
-            <span>Remote state may only narrow local behavior</span>
-          </div>
-          <form id="feature-form" class="feature-form">
-            <label
-              ><span>Feature</span
-              ><select name="feature"></select
-            ></label>
-            <label
-              ><span>Reason</span
-              ><input
-                name="reason"
-                maxlength="240"
-                placeholder="Why this feature is disabled"
-                required
-            /></label>
-            <label
-              ><span>Expires at (optional UTC)</span><input name="expiresAt" type="datetime-local"
-            /></label>
-            <button class="button warning" type="submit">Disable</button>
-          </form>
-          <div id="disablements" class="item-list"></div>
-        </article>
-        <article class="panel panel-wide" id="diagnostics">
-          <div class="panel-heading">
-            <h2>Diagnostics</h2>
-            <button class="button small" id="refresh-diagnostics" type="button">Refresh</button>
-          </div>
-          <form
-            id="large-upload-form"
-            class="large-upload-form"
-            method="post"
-            action="/admin/api/diagnostics/large-upload-grants"
-            autocomplete="off"
-          >
-            <label
-              ><span>Installation ID</span
-              ><input
-                name="installId"
-                inputmode="text"
-                maxlength="36"
-                placeholder="00000000-0000-0000-0000-000000000000"
-                required
-            /></label>
-            <label
-              ><span>Exact archive size (bytes)</span
-              ><input name="sizeBytes" type="number" min="3221225473" max="32212254720" required
-            /></label>
-            <label
-              ><span>Archive kind</span
-              ><select name="kind">
-                <option value="deep-debug">Deep debug</option>
-                <option value="live-debug">Live debug</option>
-                <option value="runtime-log">Runtime log</option>
-                <option value="installer-log">Installer log</option>
-              </select></label
-            >
-            <button class="button primary" type="submit">Issue 30-minute grant</button>
-          </form>
-          <div id="large-upload-result" class="grant-result" hidden>
-            <div>
-              <strong>Large-file grant</strong>
-              <span id="large-upload-expiry"></span>
-            </div>
-            <textarea
-              id="large-upload-grant"
-              rows="3"
-              readonly
-              aria-label="Large-file grant"
-            ></textarea>
-            <button class="button small" id="copy-large-upload-grant" type="button">
-              Copy grant
-            </button>
-          </div>
-          <div class="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Archive</th>
-                  <th>Size</th>
-                  <th>Status</th>
-                  <th>Uploaded</th>
-                  <th>Expires</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="diagnostic-rows"></tbody>
-            </table>
-          </div>
-        </article>
-        <article class="panel panel-wide" id="telemetry">
           <div class="panel-heading">
             <div>
-              <h2>Product telemetry</h2>
-              <span>Last 30 days · rotating installation pseudonyms</span>
+              <h2>Tools</h2>
+              <span>Each purpose has its own workspace.</span>
             </div>
-            <button class="button small" id="refresh-telemetry" type="button">Refresh</button>
           </div>
-          <div class="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Metric</th>
-                  <th>Feature</th>
-                  <th>Material</th>
-                  <th>Events</th>
-                  <th>Installations</th>
-                  <th>Avg. ms</th>
-                  <th>Quantity</th>
-                </tr>
-              </thead>
-              <tbody id="telemetry-rows"></tbody>
-            </table>
-          </div>
-        </article>
-        <article class="panel panel-wide" id="audit">
-          <div class="panel-heading">
-            <h2>Immutable audit</h2>
-            <button class="button small" id="refresh-audit" type="button">Refresh</button>
-          </div>
-          <div class="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Actor</th>
-                  <th>Action</th>
-                  <th>Target / revision</th>
-                </tr>
-              </thead>
-              <tbody id="audit-rows"></tbody>
-            </table>
+          <div class="tool-links">
+            <a href="/admin/codes"
+              ><strong>Redeem codes</strong><span>Publish and retire game codes.</span></a
+            ><a href="/admin/schedules"
+              ><strong>Schedules</strong><span>Manage UTC cycle anchors.</span></a
+            ><a href="/admin/features"
+              ><strong>Feature safety</strong><span>Narrow runtime behavior remotely.</span></a
+            ><a href="/admin/diagnostics"
+              ><strong>Diagnostics</strong><span>Review private support archives.</span></a
+            ><a href="/admin/telemetry"
+              ><strong>Telemetry</strong><span>Inspect aggregate product signals.</span></a
+            ><a href="/admin/audit"
+              ><strong>Audit</strong><span>Trace administrative changes.</span></a
+            ><a href="/admin/api-keys"
+              ><strong>API keys</strong><span>Create scoped read-only data access.</span></a
+            >
           </div>
         </article>
       </section>
     </main>
-    <dialog id="confirm-dialog">
-      <form method="dialog" class="confirm-card">
-        <h2>Confirm action</h2>
-        <p id="confirm-message"></p>
-        <div class="dialog-actions">
-          <button class="button" value="cancel">Cancel</button
-          ><button class="button warning" value="confirm">Confirm</button>
-        </div>
-      </form>
-    </dialog>
     <script src="/assets/admin.js" defer></script>
   </body>
 </html>

@@ -56,6 +56,18 @@ async function diagnosticLoop(): Promise<void> {
     }
     if (controller.signal.aborted) break;
     try {
+      const expiredShares = await services.configurationShares.deleteExpired(new Date());
+      if (expiredShares) {
+        console.log(
+          JSON.stringify({ event: 'configuration_share_cleanup', removed: expiredShares }),
+        );
+      }
+    } catch (error) {
+      succeeded = false;
+      logError('configuration_share_cleanup_error', error);
+    }
+    if (controller.signal.aborted) break;
+    try {
       const aborted = await services.diagnosticService.reconcileMultipartOrphans(
         100,
         controller.signal,

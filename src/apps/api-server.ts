@@ -1,21 +1,19 @@
 import path from 'node:path';
 import cookie from '@fastify/cookie';
-import formbody from '@fastify/formbody';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
-import { adminCommandEnvelopeSchema } from '../contracts/admin-commands.js';
-import {
-  absoluteLimitBytes,
-  createUploadRequestSchema,
-  diagnosticKindSchema,
-  routineLimitBytes,
-} from '../contracts/diagnostics.js';
+import { createUploadRequestSchema, routineLimitBytes } from '../contracts/diagnostics.js';
 import type { Clock } from '../domain/clock.js';
 import { checksumHeaderValue, type DiagnosticService } from '../domain/diagnostic-service.js';
-import type { ControlRepository, TelemetryRepository } from '../domain/ports.js';
+import type {
+  ConfigurationShareRepository,
+  ControlRepository,
+  TelemetryRepository,
+} from '../domain/ports.js';
+import type { PostgresAdminApiKeyStore } from '../infrastructure/admin-api-key-store.js';
 import type { PostgresAuthStore } from '../infrastructure/auth-store.js';
 import type { ApiServiceConfig } from '../infrastructure/config.js';
 import type { RotatingPseudonymizer } from '../infrastructure/pseudonym.js';
@@ -23,10 +21,12 @@ import type { HmacLargeUploadAuthorizer } from '../infrastructure/large-upload-a
 import type { WebControlClient } from '../infrastructure/internal-api-client.js';
 import { parseVerifyAndValidateSnapshot } from '../infrastructure/snapshot-signer.js';
 import { TrustedProxyAddressResolver } from '../infrastructure/trusted-proxy.js';
-import { authorizeAdmin, csrfFor, registerAuthRoutes } from './auth-routes.js';
+import { registerAdminRoutes } from './admin-routes.js';
+import { registerAuthRoutes } from './auth-routes.js';
 import { registerDiagnosticInternalRoutes } from './internal-routes.js';
 import { registerPublicRoutes } from './public-routes.js';
 import { registerTelemetryRoutes } from './telemetry-routes.js';
+import { registerConfigurationShareRoutes } from './configuration-share-routes.js';
 
 const completionSchema = z
   .object({
@@ -43,33 +43,14 @@ const partGrantSchema = z
   })
   .strict();
 const idSchema = z.uuid();
-const moderationSchema = z
-  .object({
-    action: z.enum(['accept', 'reject', 'delete']),
-    retainUntil: z.iso.datetime().optional(),
-  })
-  .strict();
-const diagnosticListSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(250).default(100),
-});
 const largeUploadRequestSchema = createUploadRequestSchema.extend({
   largeUploadGrant: z.string().min(20).max(2_048).optional(),
 });
-const largeUploadGrantSchema = z
-  .object({
-    installId: z.uuid(),
-    sizeBytes: z
-      .number()
-      .int()
-      .min(routineLimitBytes + 1)
-      .max(absoluteLimitBytes),
-    kind: diagnosticKindSchema,
-  })
-  .strict();
 
 export interface ApiDependencies {
   config: ApiServiceConfig;
   authStore: PostgresAuthStore;
+  apiKeyStore: PostgresAdminApiKeyStore;
   controlRepository: ControlRepository;
   controlClient: WebControlClient;
   clock: Clock;
@@ -77,6 +58,8 @@ export interface ApiDependencies {
   pseudonymizer: RotatingPseudonymizer;
   largeUploadAuthorizer: HmacLargeUploadAuthorizer;
   telemetryRepository: TelemetryRepository;
+  configurationShares: ConfigurationShareRepository;
+  configurationSharingEnabled: boolean;
 }
 
 export async function buildApi(dependencies: ApiDependencies): Promise<FastifyInstance> {
@@ -88,11 +71,10 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       redact: redactions,
       serializers: {
         req(request: FastifyRequest) {
-          const rawUrl = request.url;
           return {
             id: request.id,
             method: request.method,
-            path: rawUrl.split('?', 1)[0],
+            path: safeRequestPath(request.url),
           };
         },
       },
@@ -102,7 +84,6 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     requestTimeout: 15_000,
   });
   await app.register(cookie);
-  await app.register(formbody);
   await app.register(helmet, {
     contentSecurityPolicy: {
       directives: {
@@ -139,8 +120,10 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       requestPath.startsWith('/admin') ||
       requestPath.startsWith('/internal/') ||
       requestPath.startsWith('/health/') ||
+      requestPath.startsWith('/v1/admin-data') ||
       requestPath.startsWith('/v1/diagnostics/') ||
-      requestPath.startsWith('/v1/telemetry/')
+      requestPath.startsWith('/v1/telemetry/') ||
+      requestPath.startsWith('/v1/shares')
     ) {
       reply.header('cache-control', 'no-store');
       reply.header('pragma', 'no-cache');
@@ -210,128 +193,19 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
   );
 
   await registerAuthRoutes(app, { config: dependencies.config, store: dependencies.authStore });
-  registerAdminRoutes(app, dependencies);
+  registerAdminRoutes(app, dependencies, publicRoot);
   registerDiagnosticRoutes(app, dependencies, clientAddresses);
   registerTelemetryRoutes(app, dependencies, clientAddresses);
+  registerConfigurationShareRoutes(app, dependencies, clientAddresses);
   registerDiagnosticInternalRoutes(app, dependencies);
   return app;
 }
 
-function registerAdminRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
-  const authDependencies = { config: dependencies.config, store: dependencies.authStore };
-  app.get('/admin', async (request, reply) => {
-    const auth = await authorizeAdmin(request, reply, authDependencies, false);
-    if (!auth) return;
-    const html = (await import('node:fs/promises')).readFile(
-      path.resolve('dist/public/admin.html'),
-      'utf8',
-    );
-    return reply
-      .type('text/html')
-      .send((await html).replace('__CSRF_TOKEN__', csrfFor(auth, dependencies.config)));
-  });
-  app.get('/admin/api/state', async (request, reply) => {
-    const auth = await authorizeAdmin(request, reply, authDependencies, false);
-    if (!auth) return;
-    return dependencies.controlRepository.readState();
-  });
-  app.post('/admin/api/commands', async (request, reply) => {
-    const auth = await authorizeAdmin(request, reply, authDependencies, true);
-    if (!auth) return;
-    const revision = await dependencies.controlClient.executeWeb(
-      auth.userId,
-      adminCommandEnvelopeSchema.parse(request.body),
-    );
-    return reply.code(201).send({ revision });
-  });
-  app.post('/admin/api/diagnostics/:id/moderate', async (request, reply) => {
-    const auth = await authorizeAdmin(request, reply, authDependencies, true);
-    if (!auth) return;
-    const id = idSchema.parse((request.params as { id?: unknown }).id);
-    const input = moderationSchema.parse(request.body);
-    await dependencies.diagnosticService.moderate(
-      id,
-      { kind: 'web', userId: auth.userId },
-      input.action,
-      input.retainUntil ? new Date(input.retainUntil) : undefined,
-    );
-    return reply.code(204).send();
-  });
-  app.get('/admin/api/diagnostics', async (request, reply) => {
-    const auth = await authorizeAdmin(request, reply, authDependencies, false);
-    if (!auth) return;
-    const query = diagnosticListSchema.parse(request.query);
-    const records = await dependencies.diagnosticService.list(query.limit);
-    return records.map((record) => ({
-      id: record.id,
-      fileName: record.request.fileName,
-      sizeBytes: record.request.sizeBytes,
-      sha256: record.request.sha256,
-      kind: record.request.kind,
-      appVersion: record.request.appVersion,
-      status: record.status,
-      createdAt: record.createdAt.toISOString(),
-      acceptanceDeadline: record.acceptanceDeadline?.toISOString() ?? null,
-      expiresAt: record.expiresAt.toISOString(),
-    }));
-  });
-  app.post('/admin/api/diagnostics/large-upload-grants', async (request, reply) => {
-    const auth = await authorizeAdmin(request, reply, authDependencies, true);
-    if (!auth) return;
-    const input = largeUploadGrantSchema.parse(request.body);
-    const now = dependencies.clock.now();
-    const grantRecord = await dependencies.diagnosticService.issueLargeUploadGrant(
-      { kind: 'web', userId: auth.userId },
-      dependencies.pseudonymizer.forInstall(input.installId, now),
-      pseudonymEpoch(now),
-      input.sizeBytes,
-      input.kind,
-    );
-    return reply.code(201).send({
-      grant: dependencies.largeUploadAuthorizer.issue(
-        {
-          grantId: grantRecord.id,
-          uploadId: grantRecord.uploadId,
-          objectKey: grantRecord.objectKey,
-          installPseudonym: grantRecord.installPseudonym,
-          sizeBytes: grantRecord.sizeBytes,
-          kind: grantRecord.kind,
-        },
-        grantRecord.expiresAt,
-      ),
-      expiresAt: grantRecord.expiresAt.toISOString(),
-    });
-  });
-  app.get('/admin/api/audit', async (request, reply) => {
-    const auth = await authorizeAdmin(request, reply, authDependencies, false);
-    if (!auth) return;
-    const query = diagnosticListSchema.parse(request.query);
-    const [control, diagnostics] = await Promise.all([
-      dependencies.controlRepository.listAudit(query.limit),
-      dependencies.diagnosticService.audit(null, query.limit),
-    ]);
-    return {
-      control: control.map((record) => ({
-        ...record,
-        createdAt: record.createdAt.toISOString(),
-      })),
-      diagnostics: diagnostics.map((record) => ({
-        ...record,
-        createdAt: record.createdAt.toISOString(),
-      })),
-    };
-  });
-  app.post('/admin/api/diagnostics/:id/download', async (request, reply) => {
-    const auth = await authorizeAdmin(request, reply, authDependencies, true);
-    if (!auth) return;
-    const id = idSchema.parse((request.params as { id?: unknown }).id);
-    return {
-      url: await dependencies.diagnosticService.downloadUrl(id, {
-        kind: 'web',
-        userId: auth.userId,
-      }),
-    };
-  });
+export function safeRequestPath(rawUrl: string): string {
+  const requestPath = rawUrl.split('?', 1)[0] ?? '/';
+  return requestPath.startsWith('/v1/shares/') && requestPath !== '/v1/shares/resolve'
+    ? '/v1/shares/:secret'
+    : requestPath;
 }
 
 function registerDiagnosticRoutes(
@@ -405,10 +279,6 @@ function registerDiagnosticRoutes(
   });
 }
 
-function pseudonymEpoch(now: Date): string {
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
 export function createRateLimitKeyGenerator(
   addresses: TrustedProxyAddressResolver,
   pseudonymizer: RotatingPseudonymizer,
@@ -443,6 +313,14 @@ function safeIssue(issue: z.core.$ZodIssue): { path: string; code: string } {
 }
 
 function statusFor(error: unknown): number {
+  const explicit = (error as { statusCode?: unknown } | null)?.statusCode;
+  if (
+    typeof explicit === 'number' &&
+    Number.isInteger(explicit) &&
+    explicit >= 400 &&
+    explicit < 500
+  )
+    return explicit;
   const message = error instanceof Error ? error.message : '';
   if (message.includes('authorization failed')) return 401;
   if (message.includes('conflict')) return 409;

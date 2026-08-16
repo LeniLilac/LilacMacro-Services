@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content="__CSRF_TOKEN__" />
+    <title>API keys · LilacMacro Control Desk</title>
+    <link rel="stylesheet" href="/assets/site.css" />
+  </head>
+  <body class="admin-body">
+    <header class="masthead admin-masthead">
+      <a class="brand" href="/"><span class="brand-mark">L</span>LilacMacro</a
+      ><strong>CONTROL DESK</strong>
+      <nav class="admin-nav" aria-label="Control desk">
+        <a href="/admin">Overview</a><a href="/admin/codes">Codes</a
+        ><a href="/admin/schedules">Schedules</a><a href="/admin/features">Features</a
+        ><a href="/admin/diagnostics">Diagnostics</a><a href="/admin/telemetry">Telemetry</a
+        ><a href="/admin/audit">Audit</a><a aria-current="page" href="/admin/api-keys">API keys</a>
+      </nav>
+      <button class="button small" id="logout">Sign out</button>
+    </header>
+    <main class="admin-shell">
+      <section class="admin-heading">
+        <div>
+          <div class="eyebrow">PROGRAMMATIC ACCESS</div>
+          <h1>Read-only API keys</h1>
+          <p>
+            Create expiring, revocable credentials for selected data. Keys can never change runtime
+            state or download archives.
+          </p>
+        </div>
+      </section>
+      <div id="notice" class="notice" role="status" hidden></div>
+      <section class="admin-grid single-purpose">
+        <article class="panel panel-wide">
+          <form id="api-key-form" class="api-key-form" autocomplete="off">
+            <label
+              ><span>Key name</span
+              ><input name="name" maxlength="64" placeholder="Codex local data access" required
+            /></label>
+            <fieldset>
+              <legend>Scopes</legend>
+              <label
+                ><input name="scopes" type="checkbox" value="control:read" checked />Control
+                state</label
+              ><label
+                ><input name="scopes" type="checkbox" value="diagnostics:read" />Diagnostics
+                metadata</label
+              ><label
+                ><input name="scopes" type="checkbox" value="telemetry:read" />Telemetry
+                summaries</label
+              ><label><input name="scopes" type="checkbox" value="audit:read" />Audit trail</label>
+            </fieldset>
+            <label
+              ><span>Expires</span
+              ><select name="expiresInDays">
+                <option value="7">7 days</option>
+                <option value="30" selected>30 days</option>
+                <option value="90">90 days</option>
+              </select></label
+            ><button class="button primary" type="submit">Create key</button>
+          </form>
+          <div id="api-key-result" class="grant-result" hidden>
+            <div><strong>Copy this key now</strong><span>It will not be shown again.</span></div>
+            <textarea id="api-key-token" rows="3" readonly aria-label="New API key"></textarea
+            ><button class="button small" id="copy-api-key" type="button">Copy key</button>
+          </div>
+          <div class="api-catalog">
+            <strong>Data catalog</strong><code>GET https://macro.expeditions.gg/v1/admin-data</code
+            ><span
+              >Send the key as <code>Authorization: Bearer …</code>. The catalog lists only
+              permitted resources.</span
+            >
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Key</th>
+                  <th>Scopes</th>
+                  <th>Created</th>
+                  <th>Expires</th>
+                  <th>Last used</th>
+                  <th>Uses</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="api-key-rows"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </main>
+    <dialog id="confirm-dialog">
+      <form method="dialog" class="confirm-card">
+        <h2>Confirm action</h2>
+        <p id="confirm-message"></p>
+        <div class="dialog-actions">
+          <button class="button" value="cancel">Cancel</button
+          ><button class="button warning" value="confirm">Revoke</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="/assets/admin.js" defer></script>
+    <script src="/assets/admin-api-keys.js" defer></script>
+  </body>
+</html>

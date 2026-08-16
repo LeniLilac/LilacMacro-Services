@@ -22,14 +22,31 @@ The existing VPS host and unprivileged deploy identity are recorded only in `.lo
 - `cloudflared tunnel ready` verifies an established edge connection, and the deployment gate then reaches `/health/ready` through the canonical HTTPS origin.
 - Deployment stages an exact Git commit, builds its immutable application image once for reuse by every Node role, waits for PostgreSQL to report healthy, provisions runtime roles in a fail-closed one-shot phase, then runs migrations under a separate fail-closed phase. It starts the candidate, waits for readiness, and prunes the prior release only after success.
 - A failed readiness check restores the previous source/image/database-compatible process set.
+- A new public write path with a new retention owner requires two healthy releases. First deploy its schema, repository, and cleanup-capable worker while production composition keeps the route disabled; only a later commit may enable the route. This makes rollback land on a release that still owns every record the public path could have created.
 
 ## Proxy and cache behavior
 
 - Only the fixed `cloudflared` edge-network address is trusted. Direct loopback requests and user-supplied `X-Forwarded-For` or `CF-Connecting-IP` values cannot select a rate-limit or diagnostic pseudonym.
 - Public assets cache for one hour and may be served stale for one day during an origin error. Public HTML caches for five minutes. Signed control snapshots cache for 30 seconds with a five-minute stale-on-error window.
 - OAuth, administration, telemetry ingestion, diagnostics, internal APIs, and health endpoints always return `no-store`.
+- Read-only administrator data endpoints under `/v1/admin-data` also return `no-store`, require a scoped bearer key, and remain outside the Cloudflare Access-protected `/admin*` browser path so automation can authenticate directly.
 
 Telemetry is retained for at most 90 days. The worker deletes up to 10,000 expired rows during each maintenance loop, which bounds each transaction while exceeding the 100,000-event global daily admission budget over a day of normal worker operation. Admission also caps serialized request bytes at 64 MiB globally per UTC day and uses telemetry-specific rotating network pseudonyms to cap each network at 2,048 events and 4 MiB per day. Verify the cleanup log remains clear and query the authenticated 30-day aggregate view from the control desk. The public API role can insert bounded rows and call the bounded aggregate function, but cannot read or delete raw telemetry. Never export installation or network pseudonyms or join them to diagnostic metadata. Telemetry uses HMAC domains separate from diagnostics and rotates monthly, so active-installation counts spanning a month boundary are estimates rather than stable-user counts. Public telemetry has no genuine-client proof and must be treated as forgeable and deniable: review sample size, anomalies, and statistical evidence manually, and never automatically feed telemetry into bundled reward distributions or signed control policy.
+
+Configuration-share payloads are retained for at most 30 days and are deleted in batches of 1,000 each maintenance pass. Admission is capped at 1,000 shares/128 MiB globally and 20 shares/5 MiB per rotating share-network pseudonym per UTC day, in addition to the route limit of 10 creates per hour and 60 reads per minute per network. Treat 20-character share codes as bearer secrets: do not log them, add them to diagnostics, or expose them through administration. Retrieval uses the fixed `/v1/shares/resolve` POST path with JSON so the code does not enter edge/origin URL logs, and only its hash is stored. The API role reaches the share table only through quota-owning create and exact-hash find functions. The service stores and returns the opaque payload but does not parse or index its Plan content.
+
+### Read-only API keys
+
+Create keys only from **Control Desk → API keys**. Select the minimum required scopes and shortest practical lifetime. The full token is shown once; store it in a local secret manager or Doppler, never source control, logs, screenshots, chat, or diagnostic archives. The API stores only its hash and cannot recover it.
+
+Start at `GET /v1/admin-data` with `Authorization: Bearer <key>`. The returned catalog contains only the resources granted to that key:
+
+- `control:read` → `/v1/admin-data/control`
+- `diagnostics:read` → `/v1/admin-data/diagnostics?limit=100` (metadata only; no hash, contents, or download authority)
+- `telemetry:read` → `/v1/admin-data/telemetry?days=30` (bounded aggregates only)
+- `audit:read` → `/v1/admin-data/audit?limit=100`
+
+Revoke an unused, copied, or suspected-exposed key immediately from the same page. Creation and revocation appear in the immutable audit page; last-use time and count are operational hints, not proof that a key was never copied. API keys never authorize writes, diagnostic downloads, or further credential creation.
 
 - Keep Cloudflare Always Online disabled for the API origin because it overrides documented stale behavior.
 

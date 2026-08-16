@@ -178,3 +178,20 @@ export interface TelemetryRepository {
   summary(since: Date): Promise<readonly TelemetrySummaryRow[]>;
   deleteBefore(cutoff: Date): Promise<number>;
 }
+
+export interface SharedConfiguration {
+  code: string;
+  payload: string;
+  expiresAt: Date;
+}
+
+export interface ConfigurationShareRepository {
+  create(
+    payload: string,
+    networkPseudonym: string,
+    createdAt: Date,
+    expiresAt: Date,
+  ): Promise<SharedConfiguration | null>;
+  find(code: string, now: Date): Promise<SharedConfiguration | null>;
+  deleteExpired(now: Date): Promise<number>;
+}

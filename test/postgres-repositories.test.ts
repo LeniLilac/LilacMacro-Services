@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, randomUUID } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto';
 import { after, before, test } from 'node:test';
 import type { Pool } from 'pg';
 import { multipartPartBytes } from '../src/contracts/diagnostics.js';
 import { Ed25519SnapshotSigner } from '../src/infrastructure/snapshot-signer.js';
 import { PostgresTelemetryRepository } from '../src/infrastructure/postgres-telemetry-repository.js';
+import { PostgresConfigurationShareRepository } from '../src/infrastructure/postgres-configuration-share-repository.js';
 import {
   PostgresControlRepository,
   PostgresDiagnosticRepository,
@@ -307,6 +308,19 @@ test('Postgres runtime roles enforce the control and diagnostic authority split'
         null,
     );
     await assert.rejects(api.query('DELETE FROM telemetry_events'));
+    await assert.rejects(api.query('SELECT code_hash FROM shared_configurations'));
+    await assert.rejects(
+      api.query(
+        `INSERT INTO shared_configurations
+          (code_hash,payload,payload_sha256,created_at,expires_at)
+         VALUES (repeat('a',64),'payload',repeat('b',64),now(),now()+interval '1 day')`,
+      ),
+    );
+    assert.ok(
+      (await api.query("SELECT * FROM configuration_share_find(repeat('a',64), now())"))
+        .rowCount !== null,
+    );
+    await assert.rejects(api.query('DELETE FROM shared_configurations'));
     await assert.rejects(api.query('UPDATE control_state SET updated_at = updated_at'));
     await assert.rejects(api.query('INSERT INTO control_commands DEFAULT VALUES'));
 
@@ -316,6 +330,7 @@ test('Postgres runtime roles enforce the control and diagnostic authority split'
     );
     await assert.rejects(control.query('SELECT * FROM diagnostic_uploads'));
     await assert.rejects(control.query('SELECT * FROM telemetry_events'));
+    await assert.rejects(control.query('SELECT * FROM shared_configurations'));
     await assert.rejects(control.query('DELETE FROM control_commands'));
 
     assert.ok(((await worker.query('SELECT id FROM diagnostic_uploads')).rowCount ?? 0) >= 1);
@@ -323,6 +338,10 @@ test('Postgres runtime roles enforce the control and diagnostic authority split'
     await assert.rejects(worker.query('SELECT revision FROM control_state'));
     await assert.rejects(worker.query('SELECT * FROM telemetry_events'));
     await assert.rejects(worker.query('DELETE FROM telemetry_events'));
+    await assert.rejects(worker.query('SELECT * FROM shared_configurations'));
+    assert.ok(
+      (await worker.query('SELECT configuration_share_delete_expired(now())')).rowCount !== null,
+    );
     assert.equal(
       (
         await worker.query<{ deleted: number }>(
@@ -334,6 +353,66 @@ test('Postgres runtime roles enforce the control and diagnostic authority split'
     await assert.rejects(worker.query('DELETE FROM diagnostic_uploads'));
   } finally {
     await Promise.all([api.end(), control.end(), worker.end()]);
+  }
+});
+
+test('Postgres configuration shares expire and enforce a network daily budget', async () => {
+  const repository = new PostgresConfigurationShareRepository(pool);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1_000);
+  const created = await repository.create('Opaque_bundle_123', 's'.repeat(43), now, expiresAt);
+  assert.ok(created);
+  assert.match(created.code, /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{20}$/);
+  assert.equal((await repository.find(created.code, now))?.payload, 'Opaque_bundle_123');
+  assert.equal(
+    (
+      await pool.query<{ count: number }>(
+        'SELECT count(*)::int AS count FROM shared_configurations WHERE code_hash = $1',
+        [createHash('sha256').update(created.code).digest('hex')],
+      )
+    ).rows[0]?.count,
+    1,
+  );
+  await pool.query(
+    `UPDATE shared_configurations
+     SET created_at = $2, expires_at = $3
+     WHERE code_hash = $1`,
+    [
+      createHash('sha256').update(created.code).digest('hex'),
+      new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000),
+      new Date(now.getTime() - 1_000),
+    ],
+  );
+  assert.equal(await repository.find(created.code, now), null);
+  assert.equal(await repository.deleteExpired(now), 1);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (let index = 0; index < 20; index += 1) {
+      assert.equal(
+        (
+          await client.query<{ reserved: boolean }>(
+            'SELECT configuration_share_reserve_capacity($1, $2) AS reserved',
+            ['q'.repeat(43), 128],
+          )
+        ).rows[0]?.reserved,
+        true,
+      );
+    }
+    assert.equal(
+      (
+        await client.query<{ reserved: boolean }>(
+          'SELECT configuration_share_reserve_capacity($1, $2) AS reserved',
+          ['q'.repeat(43), 128],
+        )
+      ).rows[0]?.reserved,
+      false,
+    );
+    await client.query('ROLLBACK');
+  } finally {
+    await client.query('ROLLBACK').catch(() => undefined);
+    client.release();
   }
 });
 

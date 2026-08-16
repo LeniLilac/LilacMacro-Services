@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
 import test from 'node:test';
-import { buildApi, createRateLimitKeyGenerator } from '../src/apps/api-server.js';
+import { buildApi, createRateLimitKeyGenerator, safeRequestPath } from '../src/apps/api-server.js';
 import { CommandService } from '../src/domain/command-service.js';
 import { FixedClock } from '../src/domain/clock.js';
 import { DiagnosticService, type UploadStorage } from '../src/domain/diagnostic-service.js';
+import { PostgresAdminApiKeyStore } from '../src/infrastructure/admin-api-key-store.js';
+import { PostgresConfigurationShareRepository } from '../src/infrastructure/postgres-configuration-share-repository.js';
 import { PostgresAuthStore } from '../src/infrastructure/auth-store.js';
 import { loadConfig, requireApiConfig } from '../src/infrastructure/config.js';
 import {
@@ -118,6 +120,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
   const app = await buildApi({
     config,
     authStore,
+    apiKeyStore: new PostgresAdminApiKeyStore(postgres.pool),
     controlRepository,
     controlClient: {
       async executeWeb(actorId, envelope) {
@@ -128,6 +131,8 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     clock,
     diagnosticService,
     telemetryRepository,
+    configurationShares: new PostgresConfigurationShareRepository(postgres.pool),
+    configurationSharingEnabled: true,
     pseudonymizer: new RotatingPseudonymizer(
       config.INSTALL_PSEUDONYM_HMAC_KEY_BASE64,
       config.NETWORK_PSEUDONYM_HMAC_KEY_BASE64,
@@ -235,6 +240,50 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
         : null,
       42,
     );
+
+    const formShare = await app.inject({
+      method: 'POST',
+      url: '/v1/shares',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'payload=Cross_site_quota_fill',
+    });
+    assert.equal(formShare.statusCode, 415);
+    const shared = await app.inject({
+      method: 'POST',
+      url: '/v1/shares',
+      payload: { payload: 'Abc_123-configuration' },
+    });
+    assert.equal(shared.statusCode, 201);
+    assert.equal(shared.headers['cache-control'], 'no-store');
+    assert.match(shared.json().code, /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{20}$/);
+    const fetchedShare = await app.inject({
+      method: 'POST',
+      url: '/v1/shares/resolve',
+      payload: { code: shared.json().code },
+    });
+    assert.equal(fetchedShare.statusCode, 200);
+    assert.equal(fetchedShare.headers['cache-control'], 'no-store');
+    assert.equal(fetchedShare.json().payload, 'Abc_123-configuration');
+    const malformedShare = await app.inject({
+      method: 'POST',
+      url: '/v1/shares',
+      payload: { payload: 'not valid payload!' },
+    });
+    assert.equal(malformedShare.statusCode, 400);
+    for (let index = 0; index < 7; index += 1) {
+      const allowedShare = await app.inject({
+        method: 'POST',
+        url: '/v1/shares',
+        payload: { payload: `Allowed_share_${index}` },
+      });
+      assert.equal(allowedShare.statusCode, 201);
+    }
+    const rateLimitedShare = await app.inject({
+      method: 'POST',
+      url: '/v1/shares',
+      payload: { payload: 'One_share_too_many' },
+    });
+    assert.equal(rateLimitedShare.statusCode, 429, rateLimitedShare.body);
     const unsafeTelemetry = await app.inject({
       method: 'POST',
       url: '/v1/telemetry/events',
@@ -305,12 +354,118 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(adminPage.statusCode, 200);
     assert.equal(adminPage.headers['cache-control'], 'no-store');
     assert.doesNotMatch(adminPage.body, /__CSRF_TOKEN__/);
-    assert.match(adminPage.body, /id="large-upload-form"/);
-    assert.match(adminPage.body, /method="post"/);
-    assert.match(adminPage.body, /action="\/admin\/api\/diagnostics\/large-upload-grants"/);
-    assert.match(adminPage.body, /autocomplete="off"/);
-    assert.match(adminPage.body, /Exact archive size \(bytes\)/);
-    assert.match(adminPage.body, /id="telemetry"/);
+    assert.match(adminPage.body, /Runtime overview/);
+    assert.match(adminPage.body, /href="\/admin\/api-keys"/);
+    const diagnosticsPage = await app.inject({
+      method: 'GET',
+      url: '/admin/diagnostics',
+      headers: { cookie },
+    });
+    assert.equal(diagnosticsPage.statusCode, 200);
+    assert.match(diagnosticsPage.body, /id="large-upload-form"/);
+    assert.match(diagnosticsPage.body, /autocomplete="off"/);
+    assert.match(diagnosticsPage.body, /Exact archive size \(bytes\)/);
+    const apiKeysPage = await app.inject({
+      method: 'GET',
+      url: '/admin/api-keys',
+      headers: { cookie },
+    });
+    assert.equal(apiKeysPage.statusCode, 200);
+    assert.match(apiKeysPage.body, /Read-only API keys/);
+    assert.equal((await app.inject({ method: 'GET', url: '/v1/admin-data' })).statusCode, 401);
+    assert.equal(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/admin/api/keys',
+          headers: { cookie },
+          payload: { name: 'Test reader', scopes: ['control:read'], expiresInDays: 30 },
+        })
+      ).statusCode,
+      403,
+    );
+    const createdKey = await app.inject({
+      method: 'POST',
+      url: '/admin/api/keys',
+      headers: { cookie, 'x-csrf-token': csrf },
+      payload: { name: 'Test reader', scopes: ['control:read'], expiresInDays: 30 },
+    });
+    assert.equal(createdKey.statusCode, 201);
+    const apiToken = createdKey.json().token;
+    assert.match(apiToken, /^lmk_live_/);
+    const catalog = await app.inject({
+      method: 'GET',
+      url: '/v1/admin-data',
+      headers: { authorization: `Bearer ${apiToken}` },
+    });
+    assert.equal(catalog.statusCode, 200);
+    assert.equal(catalog.headers['cache-control'], 'no-store');
+    assert.deepEqual(catalog.json().resources, [
+      { scope: 'control:read', href: '/v1/admin-data/control' },
+    ]);
+    assert.equal(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/v1/admin-data/control',
+          headers: { authorization: `Bearer ${apiToken.slice(0, -1)}x` },
+        })
+      ).statusCode,
+      401,
+    );
+    assert.equal(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/v1/admin-data/control',
+          headers: { authorization: `Bearer ${apiToken}` },
+        })
+      ).statusCode,
+      200,
+    );
+    assert.equal(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/v1/admin-data/telemetry',
+          headers: { authorization: `Bearer ${apiToken}` },
+        })
+      ).statusCode,
+      401,
+    );
+    await assert.rejects(
+      postgres.pool.query("UPDATE admin_api_key_audit SET action = 'key.created'"),
+      /append-only/,
+    );
+    const listedKeys = await app.inject({
+      method: 'GET',
+      url: '/admin/api/keys',
+      headers: { cookie },
+    });
+    assert.equal(listedKeys.statusCode, 200);
+    assert.equal(listedKeys.json()[0].name, 'Test reader');
+    assert.equal('token' in listedKeys.json()[0], false);
+    assert.equal('secretHash' in listedKeys.json()[0], false);
+    assert.equal(
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/admin/api/keys/${createdKey.json().id}/revoke`,
+          headers: { cookie, 'x-csrf-token': csrf },
+        })
+      ).statusCode,
+      204,
+    );
+    assert.equal(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/v1/admin-data/control',
+          headers: { authorization: `Bearer ${apiToken}` },
+        })
+      ).statusCode,
+      401,
+    );
     const telemetrySummary = await app.inject({
       method: 'GET',
       url: '/admin/api/telemetry/summary?days=30',
@@ -581,6 +736,14 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     await app.close();
     await postgres.stop();
   }
+});
+
+test('request logging masks legacy share bearer paths', () => {
+  assert.equal(
+    safeRequestPath('/v1/shares/23456789ABCDEFGHJKMN?ignored=true'),
+    '/v1/shares/:secret',
+  );
+  assert.equal(safeRequestPath('/v1/shares/resolve'), '/v1/shares/resolve');
 });
 
 test('rate-limit storage keys use rotating pseudonyms instead of source addresses', () => {

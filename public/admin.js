@@ -33,12 +33,9 @@ async function request(url, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
-function envelope(command) {
-  return { commandId: crypto.randomUUID(), expectedRevision: state.revision, command };
-}
-
 function notice(message, error = false) {
   const node = document.querySelector('#notice');
+  if (!node) return;
   node.hidden = false;
   node.textContent = message;
   node.classList.toggle('error', error);
@@ -51,9 +48,15 @@ async function command(value, success = 'Signed control snapshot published.') {
   commandPending = true;
   setCommandBusy(true);
   try {
-    await request('/admin/api/commands', { method: 'POST', body: JSON.stringify(envelope(value)) });
+    await request('/admin/api/commands', {
+      method: 'POST',
+      body: JSON.stringify({
+        commandId: crypto.randomUUID(),
+        expectedRevision: state.revision,
+        command: value,
+      }),
+    });
     await loadState();
-    await loadAudit();
     notice(success);
   } catch (error) {
     notice(error.message, true);
@@ -72,38 +75,47 @@ function setCommandBusy(busy) {
 
 async function loadState() {
   state = await request('/admin/api/state');
-  document.querySelector('#revision').textContent = state.revision;
+  const revision = document.querySelector('#revision');
+  if (revision) revision.textContent = state.revision;
   const availability = document.querySelector('#availability-form');
-  availability.available.value = String(state.game.operatorAvailable);
-  availability.message.value = state.game.message || '';
-  renderList(
-    '#codes',
-    state.codes,
-    (item) => `${item.code}${item.expiresAt ? ` · expires ${formatDate(item.expiresAt)}` : ''}`,
-    async (item) => {
-      if (await confirmAction(`Remove redeem code “${item.code}”?`))
-        await command({ type: 'code.remove', code: item.code }, `Removed code ${item.code}.`);
-    },
-  );
-  renderList(
-    '#disablements',
-    state.disablements,
-    (item) =>
-      `${item.feature} · ${item.reason}${item.expiresAt ? ` · until ${formatDate(item.expiresAt)}` : ''}`,
-    async (item) => {
-      if (await confirmAction(`Re-enable ${item.feature}?`))
-        await command(
-          { type: 'feature.enable', feature: item.feature },
-          `Re-enabled ${item.feature}.`,
-        );
-    },
-  );
-  renderList(
-    '#schedules-list',
-    state.schedules,
-    (item) =>
-      `${scheduleName(item.key)} · ${formatDate(item.nextAt)} · every ${formatCadence(item.cadenceSeconds)}`,
-  );
+  if (availability) {
+    availability.available.value = String(state.game.operatorAvailable);
+    availability.message.value = state.game.message || '';
+  }
+  if (document.querySelector('#codes')) {
+    renderList(
+      '#codes',
+      state.codes,
+      (item) => `${item.code}${item.expiresAt ? ` · expires ${formatDate(item.expiresAt)}` : ''}`,
+      async (item) => {
+        if (await confirmAction(`Remove redeem code “${item.code}”?`))
+          await command({ type: 'code.remove', code: item.code }, `Removed code ${item.code}.`);
+      },
+    );
+  }
+  if (document.querySelector('#disablements')) {
+    renderList(
+      '#disablements',
+      state.disablements,
+      (item) =>
+        `${item.feature} · ${item.reason}${item.expiresAt ? ` · until ${formatDate(item.expiresAt)}` : ''}`,
+      async (item) => {
+        if (await confirmAction(`Re-enable ${item.feature}?`))
+          await command(
+            { type: 'feature.enable', feature: item.feature },
+            `Re-enabled ${item.feature}.`,
+          );
+      },
+    );
+  }
+  if (document.querySelector('#schedules-list')) {
+    renderList(
+      '#schedules-list',
+      state.schedules,
+      (item) =>
+        `${scheduleName(item.key)} · ${formatDate(item.nextAt)} · every ${formatCadence(item.cadenceSeconds)}`,
+    );
+  }
 }
 
 function renderList(selector, items, label, action) {
@@ -122,13 +134,7 @@ function renderList(selector, items, label, action) {
       const text = document.createElement('span');
       text.textContent = label(item);
       row.append(text);
-      if (action) {
-        const button = document.createElement('button');
-        button.className = 'button small';
-        button.textContent = 'Remove';
-        button.onclick = () => void action(item);
-        row.append(button);
-      }
+      if (action) row.append(actionButton('Remove', () => action(item)));
       return row;
     }),
   );
@@ -152,57 +158,40 @@ async function loadDiagnostics() {
   if (!rows.length) renderEmptyRow('#diagnostic-rows', 6, 'No diagnostic uploads.');
 }
 
-async function issueLargeUploadGrant(formElement) {
-  const form = new FormData(formElement);
-  const result = await request('/admin/api/diagnostics/large-upload-grants', {
-    method: 'POST',
-    body: JSON.stringify({
-      installId: form.get('installId'),
-      sizeBytes: Number(form.get('sizeBytes')),
-      kind: form.get('kind'),
-    }),
-  });
-  const output = document.querySelector('#large-upload-result');
-  document.querySelector('#large-upload-grant').value = result.grant;
-  document.querySelector('#large-upload-expiry').textContent =
-    `Expires ${formatDate(result.expiresAt)}`;
-  output.hidden = false;
-  formElement.reset();
-  await loadAudit();
-  notice('Large-file grant issued. Send it only to the user who supplied this installation ID.');
-}
-
-async function copyLargeUploadGrant() {
-  const grant = document.querySelector('#large-upload-grant').value;
-  if (!grant) return;
-  try {
-    await navigator.clipboard.writeText(grant);
-    notice('Large-file grant copied.');
-  } catch {
-    document.querySelector('#large-upload-grant').select();
-    notice('Clipboard access was unavailable. The grant is selected for manual copying.', true);
-  }
-}
-
 function diagnosticActions(record) {
   const node = document.createElement('td');
   node.className = 'row-actions';
-  if (record.status === 'Pending') {
+  if (record.status === 'Pending')
     node.append(
       actionButton('Accept', () => moderate(record, 'accept')),
       actionButton('Reject', () => moderate(record, 'reject'), true),
     );
-  } else if (record.status === 'Accepted') {
+  else if (record.status === 'Accepted')
     node.append(
       actionButton('Download', () => downloadDiagnostic(record)),
       actionButton('Delete', () => moderate(record, 'delete'), true),
     );
-  } else if (['Uploading', 'Verifying', 'Failed', 'Expired'].includes(record.status)) {
+  else if (['Uploading', 'Verifying', 'Failed', 'Expired'].includes(record.status))
     node.append(actionButton('Delete', () => moderate(record, 'delete'), true));
-  } else {
-    node.textContent = '—';
-  }
+  else node.textContent = '—';
   return node;
+}
+
+async function moderate(record, action) {
+  const verb =
+    action === 'accept' ? 'Accept' : action === 'reject' ? 'Reject and delete' : 'Delete';
+  if (!(await confirmAction(`${verb} “${record.fileName}” (${formatBytes(record.sizeBytes)})?`)))
+    return;
+  try {
+    await request(`/admin/api/diagnostics/${record.id}/moderate`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
+    await loadDiagnostics();
+    notice(`Diagnostic ${action} completed.`);
+  } catch (error) {
+    notice(error.message, true);
+  }
 }
 
 async function downloadDiagnostic(record) {
@@ -217,51 +206,22 @@ async function downloadDiagnostic(record) {
   }
 }
 
-async function moderate(record, action) {
-  const verb =
-    action === 'accept' ? 'Accept' : action === 'reject' ? 'Reject and delete' : 'Delete';
-  if (!(await confirmAction(`${verb} “${record.fileName}” (${formatBytes(record.sizeBytes)})?`)))
-    return;
-  try {
-    await request(`/admin/api/diagnostics/${record.id}/moderate`, {
-      method: 'POST',
-      body: JSON.stringify({ action }),
-    });
-    await Promise.all([loadDiagnostics(), loadAudit()]);
-    notice(`Diagnostic ${action} completed.`);
-  } catch (error) {
-    notice(error.message, true);
-  }
-}
-
-async function loadAudit() {
-  const audit = await request('/admin/api/audit?limit=100');
-  const combined = [
-    ...audit.control.map((record) => ({
-      time: record.createdAt,
-      actor: `${record.actor.kind}:${record.actor.userId}`,
-      action: record.command.type,
-      target: `revision ${record.resultingRevision}`,
-    })),
-    ...audit.diagnostics.map((record) => ({
-      time: record.createdAt,
-      actor: `${record.actor.kind}:${record.actor.userId}`,
-      action: record.action,
-      target: record.uploadId,
-    })),
-  ].sort((left, right) => Date.parse(right.time) - Date.parse(left.time));
-  const rows = combined.map((record) => {
-    const row = document.createElement('tr');
-    row.append(
-      cell(formatDate(record.time)),
-      cell(record.actor),
-      cell(record.action),
-      cell(record.target),
-    );
-    return row;
+async function issueLargeUploadGrant(formElement) {
+  const form = new FormData(formElement);
+  const result = await request('/admin/api/diagnostics/large-upload-grants', {
+    method: 'POST',
+    body: JSON.stringify({
+      installId: form.get('installId'),
+      sizeBytes: Number(form.get('sizeBytes')),
+      kind: form.get('kind'),
+    }),
   });
-  document.querySelector('#audit-rows').replaceChildren(...rows);
-  if (!rows.length) renderEmptyRow('#audit-rows', 4, 'No administrative actions yet.');
+  document.querySelector('#large-upload-grant').value = result.grant;
+  document.querySelector('#large-upload-expiry').textContent =
+    `Expires ${formatDate(result.expiresAt)}`;
+  document.querySelector('#large-upload-result').hidden = false;
+  formElement.reset();
+  notice('Large-file grant issued. Send it only to the user who supplied this installation ID.');
 }
 
 async function loadTelemetry() {
@@ -287,6 +247,42 @@ async function loadTelemetry() {
   if (!rows.length) renderEmptyRow('#telemetry-rows', 7, 'No telemetry in this window.');
 }
 
+async function loadAudit() {
+  const audit = await request('/admin/api/audit?limit=100');
+  const combined = [
+    ...audit.control.map((record) => ({
+      time: record.createdAt,
+      actor: `${record.actor.kind}:${record.actor.userId}`,
+      action: record.command.type,
+      target: `revision ${record.resultingRevision}`,
+    })),
+    ...audit.diagnostics.map((record) => ({
+      time: record.createdAt,
+      actor: `${record.actor.kind}:${record.actor.userId}`,
+      action: record.action,
+      target: record.uploadId,
+    })),
+    ...audit.keys.map((record) => ({
+      time: record.createdAt,
+      actor: `web:${record.actorId}`,
+      action: record.action,
+      target: record.keyId,
+    })),
+  ].sort((left, right) => Date.parse(right.time) - Date.parse(left.time));
+  const rows = combined.map((record) => {
+    const row = document.createElement('tr');
+    row.append(
+      cell(formatDate(record.time)),
+      cell(record.actor),
+      cell(record.action),
+      cell(record.target),
+    );
+    return row;
+  });
+  document.querySelector('#audit-rows').replaceChildren(...rows);
+  if (!rows.length) renderEmptyRow('#audit-rows', 4, 'No administrative actions yet.');
+}
+
 function actionButton(label, action, destructive = false) {
   const button = document.createElement('button');
   button.className = `button small${destructive ? ' warning' : ''}`;
@@ -294,19 +290,16 @@ function actionButton(label, action, destructive = false) {
   button.onclick = () => void action();
   return button;
 }
-
 function cell(value) {
   const node = document.createElement('td');
   node.textContent = value;
   return node;
 }
-
 function statusCell(status) {
   const node = cell(status);
   node.className = `status status-${status.toLowerCase()}`;
   return node;
 }
-
 function renderEmptyRow(selector, columns, message) {
   const row = document.createElement('tr');
   const node = cell(message);
@@ -315,26 +308,12 @@ function renderEmptyRow(selector, columns, message) {
   row.append(node);
   document.querySelector(selector).replaceChildren(row);
 }
-
-function confirmAction(message) {
-  const dialog = document.querySelector('#confirm-dialog');
-  document.querySelector('#confirm-message').textContent = message;
-  dialog.showModal();
-  return new Promise((resolve) =>
-    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), {
-      once: true,
-    }),
-  );
-}
-
 function utc(value) {
   return value ? new Date(value).toISOString() : null;
 }
-
 function formatDate(value) {
   return value ? new Date(value).toLocaleString(undefined, { timeZoneName: 'short' }) : '—';
 }
-
 function formatBytes(value) {
   if (value < 1024) return `${value} B`;
   const units = ['KiB', 'MiB', 'GiB'];
@@ -346,7 +325,6 @@ function formatBytes(value) {
   }
   return `${size.toFixed(size >= 10 ? 1 : 2)} ${units[index]}`;
 }
-
 function scheduleName(key) {
   return (
     {
@@ -356,82 +334,124 @@ function scheduleName(key) {
     }[key] || key
   );
 }
-
 function formatCadence(seconds) {
   if (seconds % 86400 === 0) return `${seconds / 86400} day(s)`;
   if (seconds % 3600 === 0) return `${seconds / 3600} hour(s)`;
   return `${seconds} seconds`;
 }
+function confirmAction(message) {
+  const dialog = document.querySelector('#confirm-dialog');
+  document.querySelector('#confirm-message').textContent = message;
+  dialog.showModal();
+  return new Promise((resolve) =>
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), {
+      once: true,
+    }),
+  );
+}
+async function copyValue(selector, success) {
+  const node = document.querySelector(selector);
+  try {
+    await navigator.clipboard.writeText(node.value);
+    notice(success);
+  } catch {
+    node.select();
+    notice('Clipboard access was unavailable. The value is selected for manual copying.', true);
+  }
+}
 
-document.querySelector('#feature-form [name="feature"]').replaceChildren(
-  ...featureIds.map((id) => {
-    const option = document.createElement('option');
-    option.value = id;
-    option.textContent = id;
-    return option;
-  }),
-);
-
-document.querySelector('#availability-form').onsubmit = (event) => {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  void command({
-    type: 'game.availability',
-    available: form.get('available') === 'true',
-    message: form.get('message') || null,
-  });
-};
-document.querySelector('#code-form').onsubmit = (event) => {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  void command({ type: 'code.add', code: form.get('code'), expiresAt: utc(form.get('expiresAt')) });
-  event.currentTarget.reset();
-};
-document.querySelector('#schedule-form').onsubmit = (event) => {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  void command({
-    type: 'schedule.set',
-    key: form.get('key'),
-    nextAt: utc(form.get('nextAt')),
-    cadenceSeconds: Number(form.get('cadenceSeconds')),
-  });
-};
-document.querySelector('#feature-form').onsubmit = (event) => {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  void command({
-    type: 'feature.disable',
-    feature: form.get('feature'),
-    reason: form.get('reason'),
-    expiresAt: utc(form.get('expiresAt')),
-  });
-};
-document.querySelector('#schedule-form [name="key"]').onchange = (event) => {
-  document.querySelector('#schedule-form [name="cadenceSeconds"]').value =
-    event.target.value === 'gold-shop-reset'
-      ? 86400
-      : event.target.value.startsWith('expedition-shop')
-        ? 172800
-        : 604800;
-};
-document.querySelector('#refresh-diagnostics').onclick = () =>
-  void loadDiagnostics().catch((error) => notice(error.message, true));
-document.querySelector('#large-upload-form').onsubmit = (event) => {
-  event.preventDefault();
-  void issueLargeUploadGrant(event.currentTarget).catch((error) => notice(error.message, true));
-};
-document.querySelector('#copy-large-upload-grant').onclick = () => void copyLargeUploadGrant();
-document.querySelector('#refresh-audit').onclick = () =>
-  void loadAudit().catch((error) => notice(error.message, true));
-document.querySelector('#refresh-telemetry').onclick = () =>
-  void loadTelemetry().catch((error) => notice(error.message, true));
 document.querySelector('#logout').onclick = async () => {
   await request('/auth/logout', { method: 'POST' });
   location.href = '/';
 };
-
-document.querySelector('#schedule-form [name="cadenceSeconds"]').value = 86400;
-void Promise.all([loadState(), loadDiagnostics(), loadTelemetry(), loadAudit()]).catch((error) =>
-  notice(error.message, true),
-);
+const availabilityForm = document.querySelector('#availability-form');
+if (availabilityForm)
+  availabilityForm.onsubmit = (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    void command({
+      type: 'game.availability',
+      available: form.get('available') === 'true',
+      message: form.get('message') || null,
+    });
+  };
+const codeForm = document.querySelector('#code-form');
+if (codeForm)
+  codeForm.onsubmit = (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    void command({
+      type: 'code.add',
+      code: form.get('code'),
+      expiresAt: utc(form.get('expiresAt')),
+    });
+    event.currentTarget.reset();
+  };
+const scheduleForm = document.querySelector('#schedule-form');
+if (scheduleForm) {
+  scheduleForm.cadenceSeconds.value = 86400;
+  scheduleForm.key.onchange = (event) => {
+    scheduleForm.cadenceSeconds.value =
+      event.target.value === 'gold-shop-reset'
+        ? 86400
+        : event.target.value.startsWith('expedition-shop')
+          ? 172800
+          : 604800;
+  };
+  scheduleForm.onsubmit = (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    void command({
+      type: 'schedule.set',
+      key: form.get('key'),
+      nextAt: utc(form.get('nextAt')),
+      cadenceSeconds: Number(form.get('cadenceSeconds')),
+    });
+  };
+}
+const featureForm = document.querySelector('#feature-form');
+if (featureForm) {
+  featureForm.feature.replaceChildren(
+    ...featureIds.map((id) => {
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent = id;
+      return option;
+    }),
+  );
+  featureForm.onsubmit = (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    void command({
+      type: 'feature.disable',
+      feature: form.get('feature'),
+      reason: form.get('reason'),
+      expiresAt: utc(form.get('expiresAt')),
+    });
+  };
+}
+const diagnosticRows = document.querySelector('#diagnostic-rows');
+if (diagnosticRows) {
+  document.querySelector('#refresh-diagnostics').onclick = () =>
+    void loadDiagnostics().catch((error) => notice(error.message, true));
+  document.querySelector('#large-upload-form').onsubmit = (event) => {
+    event.preventDefault();
+    void issueLargeUploadGrant(event.currentTarget).catch((error) => notice(error.message, true));
+  };
+  document.querySelector('#copy-large-upload-grant').onclick = () =>
+    void copyValue('#large-upload-grant', 'Large-file grant copied.');
+}
+const telemetryRows = document.querySelector('#telemetry-rows');
+if (telemetryRows)
+  document.querySelector('#refresh-telemetry').onclick = () =>
+    void loadTelemetry().catch((error) => notice(error.message, true));
+const auditRows = document.querySelector('#audit-rows');
+if (auditRows)
+  document.querySelector('#refresh-audit').onclick = () =>
+    void loadAudit().catch((error) => notice(error.message, true));
+const initial = [];
+if (availabilityForm || codeForm || scheduleForm || featureForm) initial.push(loadState());
+if (diagnosticRows) initial.push(loadDiagnostics());
+if (telemetryRows) initial.push(loadTelemetry());
+if (auditRows) initial.push(loadAudit());
+void Promise.all(initial).catch((error) => notice(error.message, true));

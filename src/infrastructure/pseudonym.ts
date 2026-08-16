@@ -38,6 +38,10 @@ export class RotatingPseudonymizer {
     return digest(this.networkKey, this.epoch(now), 'telemetry-network', normalizeAddress(address));
   }
 
+  public forShareNetwork(address: string, now: Date): string {
+    return digest(this.networkKey, this.epoch(now), 'share-network', normalizeAddress(address));
+  }
+
   private epoch(now: Date): string {
     return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   }

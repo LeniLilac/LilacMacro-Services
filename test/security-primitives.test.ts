@@ -105,6 +105,15 @@ test('pseudonyms rotate monthly and never expose source identifiers', () => {
     pseudonymizer.forNetwork('203.0.113.7', new Date('2026-08-14T00:00:00Z')),
   );
   assert.notEqual(telemetryNetwork, telemetryAugust);
+  const shareNetwork = pseudonymizer.forShareNetwork(
+    '203.0.113.7',
+    new Date('2026-08-14T00:00:00Z'),
+  );
+  assert.notEqual(shareNetwork, telemetryNetwork);
+  assert.notEqual(
+    shareNetwork,
+    pseudonymizer.forNetwork('203.0.113.7', new Date('2026-08-14T00:00:00Z')),
+  );
   assert.equal(
     pseudonymizer.forNetwork('::ffff:127.0.0.1', new Date('2026-08-14T00:00:00Z')),
     pseudonymizer.forNetwork('127.0.0.1', new Date('2026-08-14T00:00:00Z')),

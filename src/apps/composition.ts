@@ -2,6 +2,7 @@ import { CommandService } from '../domain/command-service.js';
 import { SystemClock } from '../domain/clock.js';
 import { DiagnosticService } from '../domain/diagnostic-service.js';
 import { OperationalSyncService } from '../domain/operational-sync.js';
+import { PostgresAdminApiKeyStore } from '../infrastructure/admin-api-key-store.js';
 import { PostgresAuthStore } from '../infrastructure/auth-store.js';
 import { BackblazeStorage } from '../infrastructure/backblaze-storage.js';
 import {
@@ -22,6 +23,7 @@ import {
   createPool,
 } from '../infrastructure/postgres-repositories.js';
 import { PostgresTelemetryRepository } from '../infrastructure/postgres-telemetry-repository.js';
+import { PostgresConfigurationShareRepository } from '../infrastructure/postgres-configuration-share-repository.js';
 import { RotatingPseudonymizer } from '../infrastructure/pseudonym.js';
 import { RobloxPlayabilityProbe } from '../infrastructure/roblox-playability.js';
 import { Ed25519SnapshotSigner } from '../infrastructure/snapshot-signer.js';
@@ -35,6 +37,7 @@ export function composeApiServices() {
   const controlRepository = new PostgresControlRepository(pool);
   const diagnosticRepository = new PostgresDiagnosticRepository(pool);
   const telemetryRepository = new PostgresTelemetryRepository(pool);
+  const configurationShares = new PostgresConfigurationShareRepository(pool);
   return {
     config,
     pool,
@@ -42,6 +45,8 @@ export function composeApiServices() {
     controlRepository,
     diagnosticRepository,
     telemetryRepository,
+    configurationShares,
+    configurationSharingEnabled: false,
     controlClient: new InternalApiClient(
       config.INTERNAL_CONTROL_ORIGIN,
       config.INTERNAL_API_TOKEN_BASE64,
@@ -54,6 +59,7 @@ export function composeApiServices() {
       new HmacUploadAuthorizer(config.UPLOAD_AUTH_HMAC_KEY_BASE64),
     ),
     authStore: new PostgresAuthStore(pool, config.OAUTH_STATE_ENCRYPTION_KEY_BASE64),
+    apiKeyStore: new PostgresAdminApiKeyStore(pool),
     pseudonymizer: new RotatingPseudonymizer(
       config.INSTALL_PSEUDONYM_HMAC_KEY_BASE64,
       config.NETWORK_PSEUDONYM_HMAC_KEY_BASE64,
@@ -105,6 +111,7 @@ export function composeWorkerServices() {
   const clock = new SystemClock();
   const diagnosticRepository = new PostgresDiagnosticRepository(pool);
   const telemetryRepository = new PostgresTelemetryRepository(pool);
+  const configurationShares = new PostgresConfigurationShareRepository(pool);
   const control = new InternalApiClient(
     config.INTERNAL_CONTROL_ORIGIN,
     config.INTERNAL_WORKER_TOKEN_BASE64,
@@ -115,6 +122,7 @@ export function composeWorkerServices() {
     clock,
     diagnosticService: composeDiagnosticService(config, diagnosticRepository, clock, null),
     telemetryRepository,
+    configurationShares,
     control,
     operationalSync: new OperationalSyncService(
       clock,
