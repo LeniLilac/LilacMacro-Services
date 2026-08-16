@@ -215,7 +215,8 @@ done
 rollback_root="${temporary_root}/rollback"
 app="${rollback_root}/app"
 incoming="${rollback_root}/incoming"
-mkdir -p "${app}/ops" "${incoming}/ops"
+first_fake_bin="${rollback_root}/first-fake-bin"
+mkdir -p "${app}/ops" "${incoming}/ops" "${first_fake_bin}"
 printf 'old\n' >"${app}/version"
 printf 'new\n' >"${incoming}/version"
 previous_release_sha="$(printf '1%.0s' {1..40})"
@@ -233,8 +234,13 @@ cat >"${incoming}/ops/deploy.sh" <<'EOF'
 exit 23
 EOF
 chmod 0755 "${app}/ops/deploy.sh" "${incoming}/ops/deploy.sh"
+cat >"${first_fake_bin}/doppler" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod 0755 "${first_fake_bin}/doppler"
 set +e
-APP_DIR="${app}" INCOMING_DIR="${incoming}" RELEASE_SHA="${candidate_release_sha}" \
+PATH="${first_fake_bin}:${PATH}" APP_DIR="${app}" INCOMING_DIR="${incoming}" RELEASE_SHA="${candidate_release_sha}" \
   PROJECT_NAME="${project}" bash ops/apply-release.sh >/dev/null 2>&1
 rollback_status=$?
 set -e
