@@ -270,7 +270,7 @@ PATH="${fake_bin}:${PATH}" APP_DIR="${first_app}" INCOMING_DIR="${first_incoming
   bash ops/apply-release.sh >/dev/null 2>&1
 first_status=$?
 set -e
-[[ "${first_status}" == 24 ]]
+[[ "${first_status}" == 70 ]]
 [[ "$(cat "${first_app}/version")" == pristine ]]
 [[ ! -e "${first_app}/.release-sha" ]]
 grep -F -- "docker compose --project-name ${project} down --remove-orphans" \
