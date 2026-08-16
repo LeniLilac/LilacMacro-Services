@@ -38,7 +38,16 @@ export class PostgresControlRepository implements ControlRepository {
       'SELECT state FROM control_state WHERE singleton = true',
     );
     if (result.rowCount !== 1) throw new Error('Control state is unavailable.');
-    return structuredClone(result.rows[0]!.state);
+    const state = structuredClone(result.rows[0]!.state);
+    return {
+      ...state,
+      releaseEvidence: state.releaseEvidence ?? null,
+      releaseFloorVersion:
+        state.releaseFloorVersion ??
+        state.releaseEvidence?.version ??
+        state.release?.version ??
+        null,
+    };
   }
 
   public async executeAndPublish(

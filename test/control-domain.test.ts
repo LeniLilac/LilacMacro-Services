@@ -10,7 +10,7 @@ import {
   publishPayload,
   type MutableControlState,
 } from '../src/domain/control-state.js';
-import { OperationalSyncService } from '../src/domain/operational-sync.js';
+import { OperationalSyncService, type ReleaseObservation } from '../src/domain/operational-sync.js';
 import {
   MemoryControlRepository,
   defaultControlState,
@@ -28,6 +28,25 @@ function signer(): Ed25519SnapshotSigner {
 
 function apply(state: MutableControlState, command: AdminCommand): MutableControlState {
   return applyAdminCommand(state, command);
+}
+
+function releaseObservation(version = '1.0.118'): ReleaseObservation {
+  const tag = `v${version}`;
+  return {
+    version,
+    tag,
+    pageUrl: `https://github.com/LeniLilac/LilacMacro/releases/tag/${tag}`,
+    installerUrl: `https://github.com/LeniLilac/LilacMacro/releases/download/${tag}/LilacMacro-Setup.exe`,
+    installerSize: 10_000_000,
+    installerSha256: 'a'.repeat(64),
+    sourceCommit: 'b'.repeat(40),
+    publishedAt: '2026-08-14T11:00:00Z',
+    verifiedAt: '2026-08-14T12:00:00Z',
+  };
+}
+
+function releaseCommand(version = '1.0.118'): Extract<AdminCommand, { type: 'release.set' }> {
+  return { type: 'release.set', ...releaseObservation(version) };
 }
 
 test('control state applies every closed command without mutating the input', () => {
@@ -75,15 +94,20 @@ test('control state applies every closed command without mutating the input', ()
     });
   }
   assert.equal(state.schedules.length, scheduleKeys.length);
-  state = apply(state, {
-    type: 'release.set',
-    version: '1.2.3',
-    pageUrl: 'https://github.com/LeniLilac/LilacMacro/releases/tag/v1.2.3',
-    installerUrl:
-      'https://github.com/LeniLilac/LilacMacro/releases/download/v1.2.3/LilacMacro-Setup.exe',
-    publishedAt: '2026-08-14T12:00:00Z',
-  });
+  state = apply(state, releaseCommand('1.2.3'));
   assert.equal(state.release?.version, '1.2.3');
+  state = apply(state, { type: 'release.clear' });
+  assert.equal(state.release, null);
+  assert.equal(state.releaseFloorVersion, '1.2.3');
+  assert.throws(() => apply(state, releaseCommand('1.2.2')), /rollback was rejected/);
+  assert.throws(
+    () =>
+      apply(state, {
+        ...releaseCommand('1.2.3'),
+        installerSha256: 'c'.repeat(64),
+      }),
+    /assets changed/,
+  );
 });
 
 test('published payload filters expired entries and combines availability fail closed', () => {
@@ -187,13 +211,7 @@ test('operational sync publishes changed release and current Roblox playability'
     control,
     {
       async current() {
-        return {
-          version: '1.0.118',
-          pageUrl: 'https://github.com/LeniLilac/LilacMacro/releases/tag/v1.0.118',
-          installerUrl:
-            'https://github.com/LeniLilac/LilacMacro/releases/download/v1.0.118/LilacMacro-Setup.exe',
-          publishedAt: '2026-08-14T11:00:00Z',
-        };
+        return releaseObservation();
       },
     },
     {
@@ -245,13 +263,7 @@ test('operational vendor probes remain independently callable after either failu
     control,
     {
       async current() {
-        return {
-          version: '1.0.118',
-          pageUrl: 'https://github.com/LeniLilac/LilacMacro/releases/tag/v1.0.118',
-          installerUrl:
-            'https://github.com/LeniLilac/LilacMacro/releases/download/v1.0.118/LilacMacro-Setup.exe',
-          publishedAt: '2026-08-14T11:00:00Z',
-        };
+        return releaseObservation();
       },
     },
     {

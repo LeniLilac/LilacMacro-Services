@@ -25,6 +25,8 @@ export function defaultControlState(): MutableControlState {
     schedules: [],
     disablements: [],
     release: null,
+    releaseEvidence: null,
+    releaseFloorVersion: null,
   };
 }
 

@@ -31,6 +31,12 @@
   background: var(--download-pink);
 }
 
+.downloads-body a.release-unavailable {
+  cursor: not-allowed;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
 .download-hero {
   width: min(100%, 1540px);
   margin: 0 auto;
@@ -88,6 +94,47 @@
 .release-note {
   margin: 20px 0 0;
   color: var(--download-muted);
+}
+
+.release-note a {
+  color: inherit;
+  font-weight: 700;
+}
+
+.installer-trust {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
+  gap: clamp(28px, 5vw, 72px);
+  margin-top: clamp(64px, 7vw, 96px);
+  padding: clamp(24px, 3.4vw, 44px);
+  border: 2px solid var(--download-ink);
+  background: var(--download-pink-soft);
+  box-shadow: 8px 8px 0 var(--download-ink);
+}
+
+.installer-trust h2 {
+  margin-top: 12px;
+  font-size: clamp(34px, 4vw, 58px);
+  line-height: 0.98;
+}
+
+.trust-copy {
+  align-self: end;
+}
+
+.trust-copy p {
+  margin: 0;
+  color: var(--download-muted);
+  line-height: 1.55;
+}
+
+.trust-copy p + p {
+  margin-top: 16px;
+}
+
+.trust-copy a {
+  color: var(--download-ink);
+  font-weight: 750;
 }
 
 .requirements {
@@ -405,6 +452,7 @@
 }
 
 @media (max-width: 880px) {
+  .installer-trust,
   .requirements-heading,
   .quickstart-heading,
   .guide-row {
@@ -450,6 +498,11 @@
   }
 
   .requirements {
+    padding: 22px 18px;
+    box-shadow: 6px 6px 0 var(--download-ink);
+  }
+
+  .installer-trust {
     padding: 22px 18px;
     box-shadow: 6px 6px 0 var(--download-ink);
   }

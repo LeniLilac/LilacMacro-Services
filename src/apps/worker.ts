@@ -86,10 +86,17 @@ async function diagnosticLoop(): Promise<void> {
 
 async function controlLoop(): Promise<void> {
   while (!controller.signal.aborted) {
+    let releaseStateSynchronized = true;
     try {
       await services.operationalSync.syncRelease();
     } catch (error) {
       logError('release_sync_error', error);
+      try {
+        await services.operationalSync.clearRelease();
+      } catch (clearError) {
+        releaseStateSynchronized = false;
+        logError('release_clear_error', clearError);
+      }
     }
     if (controller.signal.aborted) break;
     try {
@@ -98,11 +105,13 @@ async function controlLoop(): Promise<void> {
       logError('playability_sync_error', error);
     }
     if (controller.signal.aborted) break;
-    try {
-      await services.control.republish();
-      lastRepublishSuccess = Date.now();
-    } catch (error) {
-      logError('republish_error', error);
+    if (releaseStateSynchronized) {
+      try {
+        await services.control.republish();
+        lastRepublishSuccess = Date.now();
+      } catch (error) {
+        logError('republish_error', error);
+      }
     }
     await heartbeat.refresh();
     await wait(5 * 60_000);

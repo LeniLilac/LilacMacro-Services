@@ -7,11 +7,13 @@ import { defaultControlState } from '../src/infrastructure/memory-repositories.j
 import { Ed25519SnapshotSigner } from '../src/infrastructure/snapshot-signer.js';
 
 const template = [
-  '<a href="__LILAC_DOWNLOAD_URL__">Download</a>',
+  '<a class="button__LILAC_RELEASE_CLASS__" href="__LILAC_DOWNLOAD_URL__"__LILAC_RELEASE_LINK_STATE__>',
+  '__LILAC_RELEASE_ACTION_LABEL__ __LILAC_RELEASE_SHORT_LABEL__</a>',
+  '<p>__LILAC_RELEASE_STATUS__</p>',
   '<a href="__LILAC_DISCORD_INSTALL_URL__">Install Discord app</a>',
 ].join('');
 
-test('public home renders direct installer from a fresh signed snapshot', async () => {
+test('public home renders the reviewable release page from a fresh signed snapshot', async () => {
   const pair = generateKeyPairSync('ed25519');
   const privateKey = pair.privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64');
   const publicKey = pair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
@@ -36,12 +38,15 @@ test('public home renders direct installer from a fresh signed snapshot', async 
     0,
   );
 
-  assert.match(html, /releases\/download\/v1\.2\.3\/LilacMacro-Setup\.exe/);
+  assert.match(html, /releases\/tag\/v1\.2\.3/);
+  assert.doesNotMatch(html, /releases\/download\/v1\.2\.3\/LilacMacro-Setup\.exe/);
   assert.match(html, /discord\.com\/oauth2\/authorize\?client_id=123456789012345678/);
+  assert.match(html, /Open verified GitHub release Verified release/);
+  assert.doesNotMatch(html, /aria-disabled/);
   assert.doesNotMatch(html, /__LILAC_/);
 });
 
-test('public home falls back safely when a snapshot cannot be trusted', () => {
+test('public home disables release actions when a snapshot cannot be trusted', () => {
   const html = renderPublicHome(
     template,
     null,
@@ -51,7 +56,9 @@ test('public home falls back safely when a snapshot cannot be trusted', () => {
     0,
   );
 
-  assert.match(html, /releases\/latest/);
+  assert.match(html, /href="#release-status" aria-disabled="true" tabindex="-1"/);
+  assert.match(html, /No verified release available Release unavailable/);
+  assert.match(html, /Downloads are paused/);
   assert.doesNotMatch(html, /__LILAC_/);
 });
 
@@ -70,8 +77,9 @@ test('legal pages publish direct contact and the implemented privacy controls', 
     assert.doesNotMatch(page, /private contact channel|contact@vanguardvalues\.gg/);
   }
   assert.match(privacy, /Online features and\s+product telemetry are initially shown on/);
-  assert.match(privacy, /Telemetry is deleted after no more than 90 days/);
-  assert.match(privacy, /Routine archives expire after 72 hours/);
+  assert.match(privacy, /Telemetry becomes eligible for scheduled deletion after 90 days/);
+  assert.match(privacy, /Access to routine archives expires after 72\s+hours/);
+  assert.match(privacy, /separate local cleanup setting can keep\s+only the 20 newest/);
   assert.match(terms, /PolyForm Noncommercial\s+License 1\.0\.0/);
   assert.match(terms, /href="\/privacy">Privacy Policy<\/a>/);
 });

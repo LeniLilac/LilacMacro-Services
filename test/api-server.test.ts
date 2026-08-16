@@ -143,7 +143,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
   try {
     const landing = await app.inject({ method: 'GET', url: '/' });
     assert.equal(landing.statusCode, 200);
-    assert.match(landing.headers['cache-control'] ?? '', /max-age=300/);
+    assert.equal(landing.headers['cache-control'], 'public, max-age=60, must-revalidate');
     assert.match(landing.body, /class="product-figure hero-product"/);
     assert.match(landing.body, /href="\/downloads"/);
     assert.doesNotMatch(landing.body, /__LILAC_DOWNLOAD_URL__/);
@@ -178,15 +178,18 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.doesNotMatch(landingCss.body, /\[data-reveal\]\.is-visible/);
     const downloads = await app.inject({ method: 'GET', url: '/downloads' });
     assert.equal(downloads.statusCode, 200);
-    assert.match(downloads.headers['cache-control'] ?? '', /max-age=300/);
+    assert.equal(downloads.headers['cache-control'], 'public, max-age=60, must-revalidate');
     assert.match(downloads.body, /Your run starts/);
     assert.match(downloads.body, /Minimum/);
     assert.match(downloads.body, /Recommended/);
     assert.match(downloads.body, /Windows 10 1903\+/);
     assert.match(downloads.body, /NVIDIA GPU, compute capability 6\.0\+/);
+    assert.match(downloads.body, /Windows scale at 100%/);
+    assert.match(downloads.body, /Unknown publisher/);
+    assert.match(downloads.body, /project-signed Ed25519 manifest/);
     assert.match(downloads.body, /INSTALL WALKTHROUGH/);
     assert.match(downloads.body, /FIRST PLAN &amp; SETUP/);
-    assert.match(downloads.body, /releases\/latest/);
+    assert.match(downloads.body, /github\.com\/LeniLilac\/LilacMacro\/releases/);
     assert.doesNotMatch(downloads.body, /__LILAC_DOWNLOAD_URL__/);
     const downloadsCss = await app.inject({ method: 'GET', url: '/assets/downloads.css' });
     assert.equal(downloadsCss.statusCode, 200);
@@ -201,7 +204,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     const terms = await app.inject({ method: 'GET', url: '/terms' });
     assert.equal(terms.statusCode, 200);
     assert.match(terms.body, /Terms of Service/);
-    assert.match(terms.headers['cache-control'] ?? '', /max-age=300/);
+    assert.equal(terms.headers['cache-control'], 'public, max-age=60, must-revalidate');
     const health = await app.inject({ method: 'GET', url: '/health/live' });
     assert.equal(health.statusCode, 200);
     assert.equal(health.headers['cache-control'], 'no-store');

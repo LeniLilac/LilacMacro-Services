@@ -13,7 +13,14 @@ export interface MutableControlState {
   schedules: ControlPayload['schedules'];
   disablements: ControlPayload['disablements'];
   release: ControlPayload['release'];
+  releaseEvidence: ReleaseEvidence | null;
+  releaseFloorVersion: string | null;
 }
+
+export type ReleaseEvidence = Omit<
+  Extract<AdminCommand, { type: 'release.set' }>,
+  'type' | 'pageUrl' | 'installerUrl' | 'publishedAt'
+>;
 
 export function applyAdminCommand(
   state: MutableControlState,
@@ -69,6 +76,7 @@ export function applyAdminCommand(
         ],
       };
     case 'release.set':
+      assertReleaseProgression(state, command);
       return {
         ...state,
         release: {
@@ -77,8 +85,58 @@ export function applyAdminCommand(
           installerUrl: command.installerUrl,
           publishedAt: command.publishedAt,
         },
+        releaseEvidence: {
+          version: command.version,
+          tag: command.tag,
+          installerSize: command.installerSize,
+          installerSha256: command.installerSha256,
+          sourceCommit: command.sourceCommit,
+          verifiedAt: command.verifiedAt,
+        },
+        releaseFloorVersion: command.version,
+      };
+    case 'release.clear':
+      return {
+        ...state,
+        release: null,
+        releaseFloorVersion:
+          state.releaseFloorVersion ??
+          state.releaseEvidence?.version ??
+          state.release?.version ??
+          null,
       };
   }
+}
+
+function assertReleaseProgression(
+  state: MutableControlState,
+  command: Extract<AdminCommand, { type: 'release.set' }>,
+): void {
+  const floor =
+    state.releaseFloorVersion ?? state.releaseEvidence?.version ?? state.release?.version;
+  if (floor && compareVersions(command.version, floor) < 0) {
+    throw new Error('Automatic release rollback was rejected.');
+  }
+  const previous = state.releaseEvidence;
+  if (
+    previous?.version === command.version &&
+    (previous.tag !== command.tag ||
+      previous.installerSize !== command.installerSize ||
+      previous.installerSha256 !== command.installerSha256 ||
+      previous.sourceCommit !== command.sourceCommit)
+  ) {
+    throw new Error('Published release assets changed without a new version.');
+  }
+}
+
+function compareVersions(left: string, right: string): number {
+  const leftParts = left.split('.').map(Number);
+  const rightParts = right.split('.').map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    const comparison = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (comparison !== 0) return comparison;
+  }
+  return 0;
 }
 
 export function publishPayload(

@@ -45,11 +45,23 @@ restore() {
   status=$?
   trap - EXIT
   if [[ "${status}" -ne 0 && -d "${previous}" && ! -L "${previous}" ]]; then
-    (cd "${app}" && doppler run -- docker compose --project-name "${project}" down --remove-orphans) || true
+    rollback_status=0
+    if ! (cd "${app}" && doppler run -- docker compose --project-name "${project}" down --remove-orphans); then
+      rollback_status=1
+    fi
     rsync -a --delete "${previous}/" "${app}/"
     if [[ -n "${previous_sha}" ]]; then
-      (cd "${app}" && RELEASE_SHA="${previous_sha}" PROJECT_NAME="${project}" bash ops/deploy.sh) || true
+      if ! (cd "${app}" && RELEASE_SHA="${previous_sha}" PROJECT_NAME="${project}" bash ops/deploy.sh); then
+        rollback_status=1
+      fi
+    else
+      rollback_status=1
     fi
+    if [[ "${rollback_status}" -ne 0 ]]; then
+      printf '%s\n' 'FATAL: candidate deployment and health-verified rollback both failed.' >&2
+      exit 70
+    fi
+    printf '%s\n' "Candidate deployment failed; prior release ${previous_sha} was restored and passed its health gate." >&2
   fi
   exit "${status}"
 }

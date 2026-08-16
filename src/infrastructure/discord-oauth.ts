@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readBoundedJson } from './bounded-json.js';
 
 const tokenResponseSchema = z
   .object({
@@ -50,15 +51,17 @@ export async function exchangeDiscordCode(
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body,
+    redirect: 'error',
     signal: AbortSignal.timeout(10_000),
   });
   if (!tokenResponse.ok) throw new Error('Discord OAuth token exchange failed.');
-  const token = tokenResponseSchema.parse(await tokenResponse.json());
+  const token = tokenResponseSchema.parse(await readBoundedJson(tokenResponse, 64 * 1024));
   const userResponse = await fetch('https://discord.com/api/v10/users/@me', {
     headers: { authorization: `Bearer ${token.access_token}` },
+    redirect: 'error',
     signal: AbortSignal.timeout(10_000),
   });
   if (!userResponse.ok) throw new Error('Discord identity lookup failed.');
-  const user = userSchema.parse(await userResponse.json());
+  const user = userSchema.parse(await readBoundedJson(userResponse, 64 * 1024));
   return { id: user.id, username: user.username };
 }

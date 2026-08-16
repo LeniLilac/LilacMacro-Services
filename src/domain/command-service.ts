@@ -24,7 +24,7 @@ export class CommandService {
   }
 }
 
-const systemCommands = new Set(['game.observation', 'release.set']);
+const systemCommands = new Set(['game.observation', 'release.set', 'release.clear']);
 
 function authorizeCommand(actor: Actor, commandType: string): void {
   const systemOnly = systemCommands.has(commandType);

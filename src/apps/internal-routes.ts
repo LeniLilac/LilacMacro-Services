@@ -32,7 +32,10 @@ const systemCommandSchema = z
   })
   .strict()
   .refine(
-    (value) => value.command.type === 'game.observation' || value.command.type === 'release.set',
+    (value) =>
+      value.command.type === 'game.observation' ||
+      value.command.type === 'release.set' ||
+      value.command.type === 'release.clear',
     'Internal worker command was not system-owned.',
   );
 const moderationSchema = z
@@ -78,7 +81,11 @@ export function registerControlInternalRoutes(
     if (!dependencies.config.adminIds.has(input.actorId)) {
       return reply.code(403).send({ error: 'Administrator access required.' });
     }
-    if (input.command.type === 'game.observation' || input.command.type === 'release.set') {
+    if (
+      input.command.type === 'game.observation' ||
+      input.command.type === 'release.set' ||
+      input.command.type === 'release.clear'
+    ) {
       return reply.code(400).send({ error: 'Bot command was not administrator-owned.' });
     }
     const snapshot = await executeFresh(
@@ -96,13 +103,19 @@ export function registerControlInternalRoutes(
     if (input.command.type === 'release.set') {
       const state = await dependencies.controlRepository.readState();
       if (
-        state.release?.version === input.command.version &&
-        state.release.installerUrl === input.command.installerUrl &&
-        state.release.pageUrl === input.command.pageUrl &&
-        state.release.publishedAt === input.command.publishedAt
+        state.releaseEvidence?.version === input.command.version &&
+        state.releaseEvidence.tag === input.command.tag &&
+        state.releaseEvidence.installerSize === input.command.installerSize &&
+        state.releaseEvidence.installerSha256 === input.command.installerSha256 &&
+        state.releaseEvidence.sourceCommit === input.command.sourceCommit &&
+        state.releaseEvidence.verifiedAt === input.command.verifiedAt
       ) {
         return reply.code(201).send({ revision: state.revision });
       }
+    }
+    if (input.command.type === 'release.clear') {
+      const state = await dependencies.controlRepository.readState();
+      if (state.release === null) return reply.code(201).send({ revision: state.revision });
     }
     const snapshot = await executeFresh(
       dependencies,

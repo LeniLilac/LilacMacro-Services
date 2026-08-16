@@ -56,11 +56,21 @@ export const adminCommandSchema = z.discriminatedUnion('type', [
     .object({
       type: z.literal('release.set'),
       version: z.string().regex(/^\d+\.\d+\.\d+$/),
+      tag: z.string().regex(/^v\d+\.\d+\.\d+$/),
       pageUrl: z.url().startsWith('https://github.com/LeniLilac/LilacMacro/releases/'),
       installerUrl: z
         .url()
         .startsWith('https://github.com/LeniLilac/LilacMacro/releases/download/'),
+      installerSize: z.number().int().positive(),
+      installerSha256: z.string().regex(/^[0-9a-f]{64}$/),
+      sourceCommit: z.string().regex(/^[0-9a-f]{40}$/),
       publishedAt: z.iso.datetime(),
+      verifiedAt: z.iso.datetime(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('release.clear'),
     })
     .strict(),
 ]);

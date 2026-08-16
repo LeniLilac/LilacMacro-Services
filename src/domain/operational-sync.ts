@@ -9,9 +9,14 @@ export interface SystemControlClient {
 
 export interface ReleaseObservation {
   version: string;
+  tag: string;
   pageUrl: string;
   installerUrl: string;
+  installerSize: number;
+  installerSha256: string;
+  sourceCommit: string;
   publishedAt: string;
+  verifiedAt: string;
 }
 
 export interface ReleaseProbe {
@@ -38,6 +43,10 @@ export class OperationalSyncService {
   public async syncRelease(): Promise<void> {
     const release = await this.releaseProbe.current();
     await this.execute({ type: 'release.set', ...release });
+  }
+
+  public async clearRelease(): Promise<void> {
+    await this.execute({ type: 'release.clear' });
   }
 
   public async syncPlayability(): Promise<void> {

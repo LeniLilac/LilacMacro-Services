@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, randomBytes } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes, sign as signBytes } from 'node:crypto';
 import test from 'node:test';
 import { authCookieNames } from '../src/apps/auth-routes.js';
 import { GitHubReleaseProbe } from '../src/infrastructure/github-release.js';
@@ -214,32 +214,105 @@ test('service-specific configuration requires only secrets used by that process'
   );
 });
 
-test('GitHub release probe accepts only the official stable installer inventory', async () => {
+test('GitHub release probe accepts the newest official stable or beta inventory', async () => {
+  const pair = generateKeyPairSync('ed25519');
+  const installer = Buffer.from('installer fixture');
+  const installerDigest = createHash('sha256').update(installer).digest('hex');
+  const manifest = Buffer.from(
+    JSON.stringify({
+      format: 'lilacmacro.release',
+      schemaVersion: 1,
+      keyId: 'test-release',
+      algorithm: 'Ed25519',
+      tag: 'v1.0.118',
+      sourceCommit: 'b'.repeat(40),
+      installer: {
+        name: 'LilacMacro-Setup.exe',
+        size: installer.length,
+        sha256: installerDigest.toUpperCase(),
+      },
+    }),
+  );
+  const files = new Map<string, Buffer>([
+    ['LilacMacro-Setup.exe', installer],
+    [
+      'LilacMacro-Setup.exe.sha256',
+      Buffer.from(`${installerDigest.toUpperCase()}  LilacMacro-Setup.exe\n`),
+    ],
+    ['LilacMacro-Release.json', manifest],
+    [
+      'LilacMacro-Release.sig',
+      Buffer.from(signBytes(null, manifest, pair.privateKey).toString('base64') + '\n'),
+    ],
+    ['LICENSE.md', Buffer.from('license')],
+    ['NOTICE.md', Buffer.from('notice')],
+  ]);
+  const releaseAsset = (name: string) => {
+    const contents = files.get(name)!;
+    return {
+      name,
+      browser_download_url: `https://github.com/LeniLilac/LilacMacro/releases/download/v1.0.118/${name}`,
+      size: contents.length,
+      digest: `sha256:${createHash('sha256').update(contents).digest('hex')}`,
+    };
+  };
   const response = {
     tag_name: 'v1.0.118',
     html_url: 'https://github.com/LeniLilac/LilacMacro/releases/tag/v1.0.118',
     published_at: '2026-08-14T12:00:00Z',
     draft: false,
-    prerelease: false,
+    prerelease: true,
     assets: [
-      {
-        name: 'LilacMacro-Setup.exe',
-        browser_download_url:
-          'https://github.com/LeniLilac/LilacMacro/releases/download/v1.0.118/LilacMacro-Setup.exe',
-      },
+      releaseAsset('LilacMacro-Setup.exe'),
+      releaseAsset('LilacMacro-Setup.exe.sha256'),
+      releaseAsset('LilacMacro-Release.json'),
+      releaseAsset('LilacMacro-Release.sig'),
+      releaseAsset('LICENSE.md'),
+      releaseAsset('NOTICE.md'),
     ],
   };
   const calls: string[] = [];
-  const fetcher: typeof fetch = async (input) => {
-    calls.push(String(input));
-    return new Response(JSON.stringify(response), {
+  const fetcher: typeof fetch = async (input, init) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes('/releases?')) {
+      return new Response(
+        JSON.stringify([
+          { draft: true, tag_name: 'old-draft', published_at: null, assets: null },
+          response,
+        ]),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
+    }
+    assert.equal(init?.redirect, 'manual');
+    const name = decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
+    const contents = files.get(name);
+    assert.ok(contents);
+    return new Response(Uint8Array.from(contents).buffer, {
       status: 200,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-length': String(contents.length) },
     });
   };
-  const release = await new GitHubReleaseProbe('LeniLilac/LilacMacro', 'token', fetcher).current();
+  const release = await new GitHubReleaseProbe(
+    'LeniLilac/LilacMacro',
+    'token',
+    fetcher,
+    {
+      keyId: 'test-release',
+      publicKeySpkiBase64: pair.publicKey
+        .export({ format: 'der', type: 'spki' })
+        .toString('base64'),
+    },
+    () => new Date('2026-08-14T12:05:00Z'),
+  ).current();
   assert.equal(release.version, '1.0.118');
-  assert.equal(calls.length, 1);
+  assert.equal(release.installerSha256, installerDigest);
+  assert.equal(release.verifiedAt, '2026-08-14T12:05:00.000Z');
+  assert.equal(calls.length, 6);
+  assert.match(calls[0] ?? '', /releases\?per_page=20$/);
 
   await assert.rejects(
     new GitHubReleaseProbe(
@@ -253,17 +326,30 @@ test('GitHub release probe accepts only the official stable installer inventory'
     new GitHubReleaseProbe(
       'LeniLilac/LilacMacro',
       undefined,
-      async () => new Response(JSON.stringify({ ...response, prerelease: true })),
+      async () =>
+        new Response(JSON.stringify([{ ...response, assets: response.assets.slice(0, -1) }])),
+      {
+        keyId: 'test-release',
+        publicKeySpkiBase64: pair.publicKey
+          .export({ format: 'der', type: 'spki' })
+          .toString('base64'),
+      },
     ).current(),
-    /not stable/,
+    /inventory was incomplete/,
   );
   await assert.rejects(
     new GitHubReleaseProbe(
       'LeniLilac/LilacMacro',
       undefined,
-      async () => new Response(JSON.stringify({ ...response, tag_name: 'latest' })),
+      async () => new Response(JSON.stringify([{ ...response, tag_name: 'latest' }])),
+      {
+        keyId: 'test-release',
+        publicKeySpkiBase64: pair.publicKey
+          .export({ format: 'der', type: 'spki' })
+          .toString('base64'),
+      },
     ).current(),
-    /not semantic/,
+    /did not expose an official semantic release/,
   );
 });
 

@@ -50,6 +50,8 @@ Revoke an unused, copied, or suspected-exposed key immediately from the same pag
 
 - Keep Cloudflare Always Online disabled for the API origin because it overrides documented stale behavior.
 
+The release worker accepts the newest exact `vX.Y.Z` non-draft release, including GitHub prereleases during public beta, only when all six official assets and their GitHub SHA-256 digests are present. The website fallback links to the repository's complete Releases page because GitHub's `/releases/latest` route excludes prereleases.
+
 ## Secrets
 
 Production secrets are read from Doppler at deployment/runtime. Never run commands that print the environment or Doppler secret values. Rotate Discord, Backblaze, OAuth-session, signing, pseudonym-HMAC, and database credentials independently. Ed25519 public keys may be published; private seeds may not.

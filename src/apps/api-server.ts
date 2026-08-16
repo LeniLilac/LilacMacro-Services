@@ -128,14 +128,14 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
       reply.header('cache-control', 'no-store');
       reply.header('pragma', 'no-cache');
     } else if (requestPath.startsWith('/assets/')) {
-      reply.header('cache-control', 'public, max-age=3600, stale-if-error=86400');
+      reply.header('cache-control', 'public, max-age=3600');
     } else if (
       requestPath === '/' ||
       requestPath === '/downloads' ||
       requestPath === '/privacy' ||
       requestPath === '/terms'
     ) {
-      reply.header('cache-control', 'public, max-age=300, stale-if-error=3600');
+      reply.header('cache-control', 'public, max-age=60, must-revalidate');
     }
     return payload;
   });
