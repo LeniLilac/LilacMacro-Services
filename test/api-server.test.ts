@@ -185,8 +185,10 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.match(downloads.body, /Windows 10 1903\+/);
     assert.match(downloads.body, /NVIDIA GPU, compute capability 6\.0\+/);
     assert.match(downloads.body, /Windows scale at 100%/);
-    assert.match(downloads.body, /Unknown publisher/);
-    assert.match(downloads.body, /project-signed Ed25519 manifest/);
+    assert.doesNotMatch(
+      downloads.body,
+      /INSTALLER \/ TRUST|Unknown publisher|project-signed Ed25519 manifest/,
+    );
     assert.match(downloads.body, /INSTALL WALKTHROUGH/);
     assert.match(downloads.body, /FIRST PLAN &amp; SETUP/);
     assert.match(downloads.body, /github\.com\/LeniLilac\/LilacMacro\/releases/);
