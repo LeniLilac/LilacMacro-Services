@@ -19,14 +19,6 @@
   font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
 }
 
-.downloads-body .masthead {
-  min-height: 64px;
-  padding: 9px clamp(20px, 4vw, 72px);
-  border-bottom-width: 2px;
-  background: #fffafdde;
-  backdrop-filter: blur(14px);
-}
-
 .downloads-body .button.primary {
   background: var(--download-pink);
 }
@@ -49,7 +41,6 @@
   text-align: center;
 }
 
-.downloads-body .eyebrow,
 .downloads-body .section-number {
   margin: 0;
   color: #7b3d63;
@@ -62,19 +53,10 @@
 
 .download-intro h1 {
   max-width: 1080px;
-  margin: 22px 0 0;
+  margin: 0;
   font-size: clamp(58px, 8vw, 122px);
   line-height: 0.9;
   letter-spacing: -0.06em;
-  text-wrap: balance;
-}
-
-.download-intro .lede {
-  max-width: 760px;
-  margin: 30px 0 0;
-  color: var(--download-muted);
-  font-size: clamp(18px, 1.7vw, 24px);
-  line-height: 1.45;
   text-wrap: balance;
 }
 
@@ -91,16 +73,6 @@
   min-height: 52px;
 }
 
-.release-note {
-  margin: 20px 0 0;
-  color: var(--download-muted);
-}
-
-.release-note a {
-  color: inherit;
-  font-weight: 700;
-}
-
 .requirements {
   margin-top: clamp(72px, 8vw, 118px);
   padding: clamp(28px, 4vw, 58px);
@@ -110,23 +82,14 @@
 }
 
 .requirements-heading {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(320px, 0.7fr);
-  align-items: end;
-  gap: 50px;
   padding-bottom: 32px;
   border-bottom: 2px solid var(--download-ink);
+  text-align: center;
 }
 
 .requirements-heading h2 {
-  margin-top: 12px;
-  font-size: clamp(40px, 5vw, 72px);
-}
-
-.requirements-heading > p {
   margin: 0;
-  color: var(--download-muted);
-  line-height: 1.55;
+  font-size: clamp(40px, 5vw, 72px);
 }
 
 .spec-grid {
@@ -147,15 +110,14 @@
 }
 
 .spec-card-title {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 3px 13px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
   padding: 21px 22px;
   border-bottom: 2px solid var(--download-ink);
 }
 
 .spec-card-title > span {
-  grid-row: span 2;
   color: #7b3d63;
   font:
     800 11px/1.4 'Cascadia Mono',
@@ -167,10 +129,6 @@
   margin: 0;
   font-size: 25px;
   line-height: 1;
-}
-
-.spec-card-title small {
-  color: var(--download-muted);
 }
 
 .spec-card dl {
@@ -206,11 +164,6 @@
   line-height: 1.4;
 }
 
-.requirements-note {
-  margin: 22px 0 0;
-  color: var(--download-muted);
-}
-
 .quickstart {
   padding: clamp(96px, 11vw, 170px) clamp(22px, 7vw, 112px);
   border-top: 2px solid var(--download-ink);
@@ -225,23 +178,13 @@
 }
 
 .quickstart-heading {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(300px, 0.7fr);
-  align-items: end;
-  gap: 64px;
   margin-bottom: 76px;
+  text-align: center;
 }
 
 .quickstart-heading h2 {
   font-size: clamp(54px, 7vw, 104px);
   line-height: 0.92;
-}
-
-.quickstart-heading p {
-  margin: 0 0 8px;
-  color: #cdbdc6;
-  font-size: clamp(17px, 1.5vw, 22px);
-  line-height: 1.5;
 }
 
 .guide-row {
@@ -394,17 +337,21 @@
 
 .download-closing {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
-  gap: 50px;
-  padding: clamp(90px, 10vw, 150px) clamp(22px, 8vw, 138px);
+  gap: 48px;
+  padding: clamp(90px, 10vw, 160px) clamp(24px, 8vw, 150px);
   border-block: 2px solid var(--download-ink);
   background: var(--download-pink-soft);
 }
 
 .download-closing h2 {
-  margin-top: 18px;
-  font-size: clamp(48px, 6vw, 92px);
+  font-size: clamp(52px, 7vw, 112px);
+  line-height: 0.92;
+}
+
+.download-closing .button {
+  flex: 0 0 auto;
 }
 
 .downloads-body footer {
@@ -416,14 +363,8 @@
 }
 
 @media (max-width: 880px) {
-  .requirements-heading,
-  .quickstart-heading,
   .guide-row {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .quickstart-heading {
-    gap: 28px;
   }
 
   .guide-row {
@@ -437,15 +378,6 @@
 }
 
 @media (max-width: 620px) {
-  .downloads-body .masthead {
-    gap: 12px;
-  }
-
-  .downloads-body .brand-mark {
-    width: 28px;
-    height: 28px;
-  }
-
   .download-hero {
     padding-top: 68px;
   }
@@ -463,11 +395,6 @@
   .requirements {
     padding: 22px 18px;
     box-shadow: 6px 6px 0 var(--download-ink);
-  }
-
-  .requirements-heading {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 24px;
   }
 
   .spec-grid {

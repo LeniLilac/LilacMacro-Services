@@ -130,6 +130,41 @@ select:focus-visible {
   padding: 0 14px;
   font-size: 12px;
 }
+.public-body .masthead {
+  min-height: 64px;
+  padding: 9px clamp(20px, 4vw, 72px);
+  border-bottom-width: 2px;
+  background: #fffafdde;
+  backdrop-filter: blur(14px);
+}
+.public-body .brand {
+  letter-spacing: -0.035em;
+}
+.public-body .brand-mark {
+  background: var(--accent);
+}
+.public-body nav a {
+  position: relative;
+}
+.public-body nav a::after {
+  position: absolute;
+  right: 0;
+  bottom: -6px;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  content: '';
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 160ms ease;
+}
+.public-body nav a:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+.public-body .button {
+  border-radius: 5px;
+}
 .hero {
   min-height: 720px;
   padding: 110px clamp(24px, 9vw, 170px) 80px;
@@ -775,6 +810,16 @@ dialog::backdrop {
     align-items: start;
     gap: 22px;
     flex-direction: column;
+  }
+}
+@media (max-width: 620px) {
+  .public-body .masthead {
+    gap: 12px;
+  }
+
+  .public-body .brand-mark {
+    width: 28px;
+    height: 28px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -1,7 +1,7 @@
 import type { SignedControlSnapshot } from '../contracts/control-snapshot.js';
 import { parseVerifyAndValidateSnapshot } from '../infrastructure/snapshot-signer.js';
 
-const releasesFallback = '#release-status';
+const releasesFallback = '#';
 
 export function renderPublicHome(
   template: string,
@@ -18,7 +18,7 @@ export function renderPublicHome(
     if (!snapshot) throw new Error('Control snapshot was unavailable.');
     const verified = parseVerifyAndValidateSnapshot(snapshot, publicKeys, now, minimumRevision);
     if (verified.payload.release) {
-      downloadUrl = verified.payload.release.pageUrl;
+      downloadUrl = verified.payload.release.installerUrl;
       releaseAvailable = true;
     }
   } catch {
@@ -34,11 +34,11 @@ export function renderPublicHome(
     .replaceAll('__LILAC_RELEASE_CLASS__', releaseAvailable ? '' : ' release-unavailable')
     .replaceAll(
       '__LILAC_RELEASE_ACTION_LABEL__',
-      releaseAvailable ? 'Open verified GitHub release' : 'No verified release available',
+      releaseAvailable ? 'Download Lilac Macro' : 'No verified release available',
     )
     .replaceAll(
       '__LILAC_RELEASE_SHORT_LABEL__',
-      releaseAvailable ? 'Verified release' : 'Release unavailable',
+      releaseAvailable ? 'Download' : 'Release unavailable',
     )
     .replaceAll(
       '__LILAC_RELEASE_STATUS__',

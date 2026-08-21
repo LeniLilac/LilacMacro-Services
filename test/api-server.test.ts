@@ -143,6 +143,18 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(landing.headers['cache-control'], 'public, max-age=60, must-revalidate');
     assert.match(landing.body, /class="product-figure hero-product"/);
     assert.match(landing.body, /href="\/downloads"/);
+    assert.match(landing.body, /<h1 id="hero-title">Lilac Macro<\/h1>/);
+    assert.match(landing.body, /The Expeditions macro that just works/);
+    assert.match(landing.body, /<h2 id="positioning-title">Quick setup, clear UI\.<\/h2>/);
+    assert.match(landing.body, /<h2 id="plan-title">Automate everything<\/h2>/);
+    assert.match(landing.body, /<h2 id="author-title">Configure any step<\/h2>/);
+    assert.match(
+      landing.body,
+      /<h2 id="sessions-title">Instant RDP setup<br \/>Macro multiple accounts<\/h2>/,
+    );
+    assert.match(landing.body, /<h2 id="personal-title">Customizable UI color theme<\/h2>/);
+    assert.match(landing.body, /<h2 id="closing-title">Ready when you are\.<\/h2>/);
+    assert.doesNotMatch(landing.body, /0[1-5] \/ (?:ONE WORKSPACE|PLAN|AUTHOR|SESSIONS|YOURS)/);
     assert.doesNotMatch(landing.body, /__LILAC_DOWNLOAD_URL__/);
     assert.match(landing.body, /landing\.css\?v=firefox-mobile-1/);
     assert.doesNotMatch(landing.body, /site\.js/);
@@ -173,22 +185,21 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.match(landingCss.body, /min-width: 0/);
     assert.doesNotMatch(landingCss.body, /min-width: 720px/);
     assert.doesNotMatch(landingCss.body, /\[data-reveal\]\.is-visible/);
+    assert.match(landingCss.body, /\.landing-body \.closing \{[^}]*align-items: center;/s);
     const downloads = await app.inject({ method: 'GET', url: '/downloads' });
     assert.equal(downloads.statusCode, 200);
     assert.equal(downloads.headers['cache-control'], 'public, max-age=60, must-revalidate');
-    assert.match(downloads.body, /Your run starts/);
+    assert.match(downloads.body, /Download Lilac Macro/);
+    assert.match(downloads.body, /System Requirements/);
+    assert.match(downloads.body, /Quick Start/);
     assert.match(downloads.body, /Minimum/);
     assert.match(downloads.body, /Recommended/);
-    assert.match(downloads.body, /Windows 10 1903\+/);
-    assert.match(downloads.body, /NVIDIA GPU, compute capability 6\.0\+/);
-    assert.match(downloads.body, /Windows scale at 100%/);
     assert.doesNotMatch(
       downloads.body,
       /INSTALLER \/ TRUST|Unknown publisher|project-signed Ed25519 manifest/,
     );
     assert.match(downloads.body, /INSTALL WALKTHROUGH/);
     assert.match(downloads.body, /FIRST PLAN &amp; SETUP/);
-    assert.match(downloads.body, /github\.com\/LeniLilac\/LilacMacro\/releases/);
     assert.doesNotMatch(downloads.body, /__LILAC_DOWNLOAD_URL__/);
     const downloadsCss = await app.inject({ method: 'GET', url: '/assets/downloads.css' });
     assert.equal(downloadsCss.statusCode, 200);

@@ -38,10 +38,10 @@ test('public home renders the reviewable release page from a fresh signed snapsh
     0,
   );
 
-  assert.match(html, /releases\/tag\/v1\.2\.3/);
-  assert.doesNotMatch(html, /releases\/download\/v1\.2\.3\/LilacMacro-Setup\.exe/);
+  assert.match(html, /releases\/download\/v1\.2\.3\/LilacMacro-Setup\.exe/);
+  assert.doesNotMatch(html, /releases\/tag\/v1\.2\.3/);
   assert.match(html, /discord\.com\/oauth2\/authorize\?client_id=123456789012345678/);
-  assert.match(html, /Open verified GitHub release Verified release/);
+  assert.match(html, /Download Lilac Macro Download/);
   assert.doesNotMatch(html, /aria-disabled/);
   assert.doesNotMatch(html, /__LILAC_/);
 });
@@ -56,7 +56,7 @@ test('public home disables release actions when a snapshot cannot be trusted', (
     0,
   );
 
-  assert.match(html, /href="#release-status" aria-disabled="true" tabindex="-1"/);
+  assert.match(html, /href="#" aria-disabled="true" tabindex="-1"/);
   assert.match(html, /No verified release available Release unavailable/);
   assert.match(html, /Downloads are paused/);
   assert.doesNotMatch(html, /__LILAC_/);
