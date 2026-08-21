@@ -377,6 +377,8 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(diagnosticsPage.statusCode, 200);
     assert.doesNotMatch(diagnosticsPage.body, /large-upload|Large-file grant/i);
     assert.match(diagnosticsPage.body, /verified only when you request a download/);
+    assert.match(diagnosticsPage.body, /\/assets\/admin\.js\?v=2/);
+    assert.match(diagnosticsPage.body, /\/assets\/site\.css\?v=2/);
     const [adminScript, siteStyles] = await Promise.all([
       app.inject({ method: 'GET', url: '/assets/admin.js' }),
       app.inject({ method: 'GET', url: '/assets/site.css' }),
@@ -384,6 +386,8 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.match(adminScript.body, /download will start automatically when ready/);
     assert.match(siteStyles.body, /overflow-wrap: anywhere/);
     assert.match(siteStyles.body, /width: min\(520px, calc\(100vw - 32px\)\)/);
+    assert.equal(adminScript.headers['cache-control'], 'public, max-age=0, must-revalidate');
+    assert.equal(siteStyles.headers['cache-control'], 'public, max-age=0, must-revalidate');
     const apiKeysPage = await app.inject({
       method: 'GET',
       url: '/admin/api-keys',
