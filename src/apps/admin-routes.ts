@@ -56,6 +56,15 @@ export function registerAdminRoutes(
   publicRoot: string,
 ): void {
   const authDependencies = { config: dependencies.config, store: dependencies.authStore };
+  for (const [route, file, contentType] of [
+    ['/admin/assets/site.css', 'site.css', 'text/css'],
+    ['/admin/assets/admin.js', 'admin.js', 'text/javascript'],
+  ] as const) {
+    app.get(route, async (request, reply) => {
+      if (!(await authorizeAdmin(request, reply, authDependencies, false))) return;
+      return reply.type(contentType).sendFile(file, publicRoot);
+    });
+  }
   for (const [route, file] of pages) {
     app.get(route, async (request, reply) => {
       const auth = await authorizeAdmin(request, reply, authDependencies, false);

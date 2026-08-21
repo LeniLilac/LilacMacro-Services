@@ -122,8 +122,6 @@ export async function buildApi(dependencies: ApiDependencies): Promise<FastifyIn
     ) {
       reply.header('cache-control', 'no-store');
       reply.header('pragma', 'no-cache');
-    } else if (requestPath === '/assets/admin.js' || requestPath.endsWith('.css')) {
-      reply.header('cache-control', 'public, max-age=0, must-revalidate');
     } else if (requestPath.startsWith('/assets/')) {
       reply.header('cache-control', 'public, max-age=3600');
     } else if (
