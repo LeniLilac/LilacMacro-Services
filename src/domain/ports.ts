@@ -145,10 +145,17 @@ export interface TelemetrySummaryRow {
   kind: TelemetryKind;
   feature: string | null;
   material: string | null;
+  graphicsCapability: string | null;
+  hardwareModel: string | null;
+  displayWidth: number | null;
+  displayHeight: number | null;
+  inputScaleMilli: number | null;
+  renderedScaleMilli: number | null;
   eventCount: number;
   estimatedInstallations: number;
   averageDurationMilliseconds: number | null;
   quantityTotal: number | null;
+  latestEventAt: Date;
 }
 
 export interface TelemetryRepository {

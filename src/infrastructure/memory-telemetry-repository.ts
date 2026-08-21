@@ -41,7 +41,17 @@ export class MemoryTelemetryRepository implements TelemetryRepository {
   public async summary(since: Date): Promise<readonly TelemetrySummaryRow[]> {
     const groups = new Map<string, StoredTelemetryEvent[]>();
     for (const event of this.events.filter((item) => item.occurredAtUtc >= since)) {
-      const key = `${event.kind}\0${valueOf(event, 'feature') ?? ''}\0${valueOf(event, 'material') ?? ''}`;
+      const key = [
+        event.kind,
+        valueOf(event, 'feature'),
+        valueOf(event, 'material'),
+        valueOf(event, 'graphicsCapability'),
+        valueOf(event, 'hardwareModel'),
+        valueOf(event, 'displayWidth'),
+        valueOf(event, 'displayHeight'),
+        valueOf(event, 'inputScaleMilli'),
+        valueOf(event, 'renderedScaleMilli'),
+      ].join('\0');
       groups.set(key, [...(groups.get(key) ?? []), event]);
     }
     return [...groups.values()].map((items) => {
@@ -57,6 +67,12 @@ export class MemoryTelemetryRepository implements TelemetryRepository {
         kind: items[0]!.kind,
         feature: String(valueOf(items[0]!, 'feature') ?? '') || null,
         material: String(valueOf(items[0]!, 'material') ?? '') || null,
+        graphicsCapability: String(valueOf(items[0]!, 'graphicsCapability') ?? '') || null,
+        hardwareModel: String(valueOf(items[0]!, 'hardwareModel') ?? '') || null,
+        displayWidth: nullableNumber(valueOf(items[0]!, 'displayWidth')),
+        displayHeight: nullableNumber(valueOf(items[0]!, 'displayHeight')),
+        inputScaleMilli: nullableNumber(valueOf(items[0]!, 'inputScaleMilli')),
+        renderedScaleMilli: nullableNumber(valueOf(items[0]!, 'renderedScaleMilli')),
         eventCount: items.length,
         estimatedInstallations: new Set(items.map((item) => item.installPseudonym)).size,
         averageDurationMilliseconds:
@@ -65,6 +81,7 @@ export class MemoryTelemetryRepository implements TelemetryRepository {
             : durations.reduce((sum, value) => sum + value, 0) / durations.length,
         quantityTotal:
           quantities.length === 0 ? null : quantities.reduce((sum, value) => sum + value, 0),
+        latestEventAt: new Date(Math.max(...items.map((item) => item.occurredAtUtc.getTime()))),
       };
     });
   }
@@ -79,4 +96,8 @@ export class MemoryTelemetryRepository implements TelemetryRepository {
 
 function valueOf(event: PersistedTelemetryEvent, key: PropertyKey): unknown {
   return key in event ? Reflect.get(event, key) : null;
+}
+
+function nullableNumber(value: unknown): number | null {
+  return value === null || value === undefined ? null : Number(value);
 }

@@ -284,6 +284,10 @@ test('Postgres runtime roles enforce the control and diagnostic authority split'
       (await api.query("SELECT * FROM telemetry_summary(now() - interval '30 days')")).rowCount !==
         null,
     );
+    assert.ok(
+      (await api.query("SELECT * FROM telemetry_summary_v2(now() - interval '30 days')"))
+        .rowCount !== null,
+    );
     await assert.rejects(api.query('DELETE FROM telemetry_events'));
     await assert.rejects(api.query('SELECT code_hash FROM shared_configurations'));
     await assert.rejects(
@@ -401,7 +405,7 @@ test('Postgres telemetry repository stores fixed pseudonymous events, summarizes
     pseudonym,
     'n'.repeat(43),
     '1.2.3',
-    1,
+    5,
     [
       {
         kind: 'ocr-timing',
@@ -410,6 +414,45 @@ test('Postgres telemetry repository stores fixed pseudonymous events, summarizes
         outcome: 'completed',
         durationMilliseconds: 40,
         graphicsCapability: 'gpu:0',
+        hardwareModel: 'NVIDIA GeForce RTX 4070',
+      },
+      {
+        kind: 'ocr-setup-failure',
+        occurredAtUtc: new Date('2026-08-14T13:59:40.000Z'),
+        feature: 'ocr-setup',
+        outcome: 'gpu_runtime_invalid',
+        durationMilliseconds: 1200,
+        operatingSystem: 'windows-10.0',
+        setupStage: 'gpu-runtime',
+        requestedDevice: 'gpu:0',
+        processExitCode: 1,
+        pythonLauncherPresent: true,
+        wingetPresent: true,
+        existingOcrPythonPresent: true,
+        runtimeMarkerPresent: false,
+      },
+      {
+        kind: 'local-instance-failure',
+        occurredAtUtc: new Date('2026-08-14T13:59:50.000Z'),
+        feature: 'local-instance',
+        outcome: 'helper-failed',
+        durationMilliseconds: 250,
+        operatingSystem: 'windows-10.0',
+        processExitCode: 2,
+        operation: 'add-shared',
+        failureCode: 'helper-failed',
+        configurationMode: 'shared',
+        runnerCount: 2,
+      },
+      {
+        kind: 'ui-scale-calibration',
+        occurredAtUtc: new Date('2026-08-14T13:59:55.000Z'),
+        feature: 'ui-scale',
+        outcome: 'observed',
+        displayWidth: 1920,
+        displayHeight: 1080,
+        inputScaleMilli: 1000,
+        renderedScaleMilli: 997,
       },
     ],
     now,
@@ -421,6 +464,14 @@ test('Postgres telemetry repository stores fixed pseudonymous events, summarizes
   assert.equal(ocr?.eventCount, 1);
   assert.equal(ocr?.estimatedInstallations, 1);
   assert.equal(ocr?.averageDurationMilliseconds, 40);
+  assert.equal(ocr?.graphicsCapability, 'gpu:0');
+  assert.equal(ocr?.hardwareModel, 'NVIDIA GeForce RTX 4070');
+  assert.equal(ocr?.latestEventAt.toISOString(), '2026-08-14T13:59:30.000Z');
+  const calibration = rows.find((row) => row.kind === 'ui-scale-calibration');
+  assert.equal(calibration?.displayWidth, 1920);
+  assert.equal(calibration?.displayHeight, 1080);
+  assert.equal(calibration?.inputScaleMilli, 1000);
+  assert.equal(calibration?.renderedScaleMilli, 997);
   assert.equal(
     (
       await pool.query('SELECT install_pseudonym FROM telemetry_events WHERE kind = $1', [
@@ -428,6 +479,20 @@ test('Postgres telemetry repository stores fixed pseudonymous events, summarizes
       ])
     ).rows[0]?.install_pseudonym,
     pseudonym,
+  );
+  assert.deepEqual(
+    (
+      await pool.query(
+        `SELECT setup_stage, requested_device, process_exit_code, runtime_marker_present
+         FROM telemetry_events WHERE kind = 'ocr-setup-failure'`,
+      )
+    ).rows[0],
+    {
+      setup_stage: 'gpu-runtime',
+      requested_device: 'gpu:0',
+      process_exit_code: 1,
+      runtime_marker_present: false,
+    },
   );
   await repository.insertBatch(
     pseudonym,

@@ -231,7 +231,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       payload: {
         installId: telemetryInstallId,
         appVersion: '1.2.3',
-        privacyNoticeVersion: 1,
+        privacyNoticeVersion: 5,
         events: [
           {
             kind: 'ocr-timing',
@@ -503,7 +503,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(telemetrySummary.statusCode, 200);
     assert.equal(telemetrySummary.json().rows[0].kind, 'ocr-timing');
     assert.equal(telemetrySummary.json().rows[0].estimatedInstallations, 1);
-
+    assert.equal(telemetrySummary.json().rows[0].latestEventAt, '2026-08-14T11:59:30.000Z');
     const command = {
       commandId: randomUUID(),
       expectedRevision: 0,

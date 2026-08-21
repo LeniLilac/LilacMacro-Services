@@ -241,6 +241,17 @@ async function loadTelemetry() {
       cell(record.kind),
       cell(record.feature || '—'),
       cell(record.material || '—'),
+      cell([record.graphicsCapability, record.hardwareModel].filter(Boolean).join(' · ') || '—'),
+      cell(
+        record.displayWidth === null || record.displayHeight === null
+          ? '—'
+          : `${record.displayWidth} × ${record.displayHeight}`,
+      ),
+      cell(
+        record.inputScaleMilli === null || record.renderedScaleMilli === null
+          ? '—'
+          : `${(record.inputScaleMilli / 1000).toFixed(2)} → ${(record.renderedScaleMilli / 1000).toFixed(3)}`,
+      ),
       cell(String(record.eventCount)),
       cell(String(record.estimatedInstallations)),
       cell(
@@ -249,11 +260,12 @@ async function loadTelemetry() {
           : record.averageDurationMilliseconds.toFixed(1),
       ),
       cell(record.quantityTotal === null ? '—' : String(record.quantityTotal)),
+      cell(formatDate(record.latestEventAt)),
     );
     return row;
   });
   document.querySelector('#telemetry-rows').replaceChildren(...rows);
-  if (!rows.length) renderEmptyRow('#telemetry-rows', 7, 'No telemetry in this window.');
+  if (!rows.length) renderEmptyRow('#telemetry-rows', 11, 'No telemetry in this window.');
 }
 
 async function loadAudit() {

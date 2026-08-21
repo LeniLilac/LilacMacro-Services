@@ -36,7 +36,8 @@ async function revokeApiKey(key) {
 const apiKeyForm = document.querySelector('#api-key-form');
 apiKeyForm.onsubmit = async (event) => {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
+  const submittedForm = event.currentTarget;
+  const form = new FormData(submittedForm);
   const scopes = form.getAll('scopes');
   if (!scopes.length) return notice('Select at least one read scope.', true);
   try {
@@ -50,7 +51,7 @@ apiKeyForm.onsubmit = async (event) => {
     });
     document.querySelector('#api-key-token').value = result.token;
     document.querySelector('#api-key-result').hidden = false;
-    event.currentTarget.reset();
+    submittedForm.reset();
     await loadApiKeys();
     notice('API key created. Copy it now; only its hash is stored.');
   } catch (error) {

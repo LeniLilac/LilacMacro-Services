@@ -29,7 +29,7 @@ LilacMacro Services lets a small volunteer team safely publish current game-oper
 - Discord application and Discord-OAuth admin console over the same authenticated command service.
 - Public landing, setup, privacy, status, and download pages.
 - Direct-to-Backblaze multipart diagnostic uploads with on-demand verification before administrator download, lifecycle cleanup, quotas, and moderation.
-- Fixed-schema telemetry ingestion, monthly rotating installation pseudonyms, 90-day deletion, and authenticated aggregate summaries for use, rewards, errors, and OCR timing.
+- Fixed-schema telemetry ingestion, monthly rotating installation pseudonyms, 90-day deletion, and authenticated aggregate summaries for use, rewards, errors, OCR timing by normalized CPU/GPU model, and display/UI-scale calibration.
 - Aggregate telemetry is advisory and requires human review; it never automatically changes bundled reward distributions or signed control policy.
 - Periodic macro polling with jitter, signature/rollback/expiry validation, and last-known-good fallback.
 

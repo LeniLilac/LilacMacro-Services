@@ -70,7 +70,8 @@
         </li>
         <li>
           <strong>Usage data.</strong> Sends fixed-format events about feature use, reliability,
-          expedition rewards, OCR timing, and coarse device capability.
+          expedition rewards, OCR performance by normalized CPU/GPU model, and display/UI-scale
+          calibration.
         </li>
         <li>
           <strong>Deep Debug error uploads.</strong> After a classified macro error, sends the
@@ -106,19 +107,23 @@
       <p>
         Analytics uses a closed schema containing app version; feature and outcome identifiers;
         expedition material and quantity observations; bounded error-state counters without
-        free-form exception text; OCR duration and CPU or GPU execution category; Windows version;
-        logical processor count; and process capability. It does not contain screenshots, OCR text,
-        file paths, Roblox credentials, private-server links, Discord webhook URLs, raw hardware
-        identifiers, or raw IP addresses.
+        free-form exception text; OCR duration, CPU or GPU execution category, and a normalized
+        public CPU/GPU model name; primary-display pixel dimensions; bounded UI Scale input and
+        rendered-scale values; Windows version; and logical processor count. Model names are
+        accepted only for known CPU/GPU vendors, stripped of trademark punctuation and unsupported
+        characters, and limited to 96 characters. It does not contain screenshots, OCR text, file
+        paths, Roblox credentials, private-server links, Discord webhook URLs, hardware serial
+        numbers or device IDs, or raw IP addresses.
       </p>
       <p>
         The app creates a random installation UUID. The service immediately transforms that UUID and
         the normalized source network into separate monthly rotating HMAC pseudonyms and stores
         neither source value. Analytics and diagnostics use separate HMAC domains, so their stored
         pseudonyms are not directly joinable in the database. We use aggregates to estimate active
-        installations, find error-prone states, understand feature use, improve OCR, and support
-        manually reviewed reward research. Aggregates never automatically change macro behavior,
-        reward distributions, or remote safety policy.
+        installations, find error-prone states, understand feature use, compare OCR performance by
+        hardware model, calibrate UI Scale across display resolutions, and support manually reviewed
+        reward research. Aggregates never automatically change macro behavior, reward distributions,
+        or remote safety policy.
       </p>
 
       <h3>Deep Debug error uploads</h3>
