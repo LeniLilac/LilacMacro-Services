@@ -65,6 +65,7 @@ export interface DiagnosticAuditEvent {
   action:
     | 'upload.created'
     | 'upload.completed'
+    | 'verification.requested'
     | 'verification.succeeded'
     | 'verification.failed'
     | 'moderation.accept'

@@ -23,7 +23,7 @@ Run the credentialed provider proof only in a controlled staging environment wit
 - Canonical JSON and Ed25519 tests must include unknown-key, tamper, rollback, future-time, and expiry negatives.
 - Admin commands must cover authorization, actor ownership, revision conflicts, idempotency, schema rejection, and public-payload filtering.
 - OAuth tests must cover PKCE, browser binding, expiry, one-time consumption, session revocation, CSRF, and provider failure.
-- Diagnostics must cover consent, quotas, multipart bounds, token binding, full-object byte/hash verification, manual acceptance, administrator deletion of accepted archives, deletion retries, and cleanup expiry.
+- Diagnostics must cover consent, quotas, multipart bounds, token binding, stored-without-verification expiry, idempotent on-demand download requests, full-object byte/hash verification before download, administrator deletion, deletion retries, and cleanup expiry.
 - Deployment changes require a rendered Compose configuration, container build, migration rehearsal, readiness failure, and rollback rehearsal in staging.
 
 External live checks are staging-only and opt-in. Never make a test depend on production credentials or mutate production state.

@@ -127,9 +127,11 @@
         LilacMacro has no manual diagnostic-upload control or file picker. Automatic reports use one
         3 GiB archive limit. The client hashes the complete archive, binds its exact size and
         checksum, rejects redirects, and accepts storage URLs only for the trusted diagnostic
-        destination. Access expires 72 hours after verification. Expired objects enter the deletion
-        queue; bounded retries can delay physical removal during an outage. Diagnostic archives
-        remain in private object storage and are never served as public content.
+        destination. Completed archives remain private and stored without a full server-side read
+        until an administrator asks to download one. That request verifies the complete size and
+        checksum before download; invalid archives are deleted. Requested and unrequested archives
+        expire 72 hours after upload and enter the deletion queue; bounded retries can delay
+        physical removal during an outage. Diagnostic archives are never served as public content.
       </p>
 
       <h2>Information kept on your device</h2>

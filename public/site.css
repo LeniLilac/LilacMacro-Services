@@ -704,11 +704,16 @@ th {
 .status-pending {
   color: #8b5d00;
 }
+.status-stored,
+.status-verifying {
+  color: #8b5d00;
+}
 .status-rejected,
 .status-failed {
   color: #bd2635;
 }
 dialog {
+  width: min(520px, calc(100vw - 32px));
   max-width: 520px;
   padding: 0;
   border: 0;
@@ -728,12 +733,18 @@ dialog::backdrop {
 }
 .confirm-card p {
   line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .dialog-actions {
   display: flex;
   justify-content: end;
   gap: 12px;
   margin-top: 24px;
+  flex-wrap: wrap;
+}
+.dialog-actions .button {
+  min-width: 118px;
 }
 @media (max-width: 850px) {
   body:not(.admin-body) nav {

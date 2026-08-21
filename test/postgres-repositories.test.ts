@@ -125,8 +125,24 @@ test('Postgres diagnostic repository enforces quotas, bound parts, audit, and re
   );
   assert.equal(
     await repository.transition(record.id, ['Uploading'], 'Pending', {
-      acceptanceDeadline: new Date(now.getTime() + 1_800_000),
+      acceptanceDeadline: null,
       providerUploadId: null,
+    }),
+    true,
+  );
+  assert.equal(
+    await repository.insertWithinQuota(
+      diagnosticRecord(now, randomUUID()),
+      new Date(now.getTime() - 86_400_000),
+      limits,
+      createdAudit,
+    ),
+    true,
+    'Stored Pending archives must not consume the active-upload quota.',
+  );
+  assert.equal(
+    await repository.transition(record.id, ['Pending'], 'Pending', {
+      acceptanceDeadline: new Date(now.getTime() + 1_800_000),
       audit: {
         actor: { kind: 'web', userId: '123' },
         action: 'moderation.accept',
@@ -136,6 +152,12 @@ test('Postgres diagnostic repository enforces quotas, bound parts, audit, and re
     }),
     true,
   );
+  await repository.appendAudit(record.id, {
+    actor: { kind: 'web', userId: '123' },
+    action: 'verification.requested',
+    details: {},
+    createdAt: now,
+  });
   await repository.appendAudit(record.id, {
     actor: { kind: 'discord', userId: '456' },
     action: 'download.requested',

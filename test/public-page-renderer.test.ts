@@ -78,7 +78,8 @@ test('legal pages publish direct contact and the implemented privacy controls', 
   }
   assert.match(privacy, /Online features and\s+product telemetry are initially shown on/);
   assert.match(privacy, /Telemetry becomes eligible for scheduled deletion after 90 days/);
-  assert.match(privacy, /Access expires 72 hours after verification/);
+  assert.match(privacy, /expire 72 hours after upload/);
+  assert.match(privacy, /stored without a full server-side read/);
   assert.match(privacy, /no manual diagnostic-upload control or file picker/);
   assert.doesNotMatch(privacy, /administrator grant|30 GiB/);
   assert.match(privacy, /separate local cleanup setting can keep\s+only the 20 newest/);

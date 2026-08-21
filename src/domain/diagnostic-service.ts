@@ -69,6 +69,9 @@ export interface UploadStatusView {
   expiresAt: string;
 }
 
+export type DiagnosticDownloadResult =
+  { status: 'Verifying' } | { status: 'Accepted'; url: string };
+
 export type DiagnosticModerationAction = 'delete';
 
 export interface UploadAuthorizer {
@@ -235,7 +238,7 @@ export class DiagnosticService {
       );
       await this.storage.verifySize(record.objectKey, record.request.sizeBytes);
       if (
-        !(await this.repository.transition(id, ['Completing'], 'Verifying', {
+        !(await this.repository.transition(id, ['Completing'], 'Pending', {
           providerUploadId: null,
           audit: {
             actor: { kind: 'system', userId: '0' },
@@ -285,18 +288,50 @@ export class DiagnosticService {
   }
 
   public async downloadUrl(id: string, actor: Actor): Promise<string> {
-    const record = await this.repository.find(id);
-    if (!record || record.status !== 'Accepted' || record.expiresAt <= this.clock.now()) {
-      throw new Error('Diagnostic upload is not accepted.');
+    const result = await this.requestDownload(id, actor);
+    if (result.status !== 'Accepted') throw new Error('Diagnostic upload is still verifying.');
+    return result.url;
+  }
+
+  public async requestDownload(id: string, actor: Actor): Promise<DiagnosticDownloadResult> {
+    const now = this.clock.now();
+    let record = await this.repository.find(id);
+    if (!record || record.expiresAt <= now) {
+      throw new Error('Diagnostic upload is unavailable or expired.');
     }
+
+    if (record.status === 'Pending' && record.acceptanceDeadline === null) {
+      const verificationDeadline = new Date(
+        Math.min(record.expiresAt.getTime(), now.getTime() + 24 * 60 * 60 * 1000),
+      );
+      const queued = await this.repository.transition(id, ['Pending'], 'Verifying', {
+        acceptanceDeadline: verificationDeadline,
+        audit: {
+          actor,
+          action: 'verification.requested',
+          details: {},
+          createdAt: now,
+        },
+      });
+      if (queued) return { status: 'Verifying' };
+      record = await this.repository.find(id);
+    }
+
+    if (record?.status === 'Verifying' || record?.status === 'VerifyingActive') {
+      return { status: 'Verifying' };
+    }
+    if (record?.status !== 'Accepted') {
+      throw new Error('Diagnostic upload is unavailable for download.');
+    }
+
     const url = await this.storage.presignDownload(record.objectKey, record.request.fileName);
     await this.repository.appendAudit(id, {
       actor,
       action: 'download.requested',
       details: {},
-      createdAt: this.clock.now(),
+      createdAt: now,
     });
-    return url;
+    return { status: 'Accepted', url };
   }
 
   public async cleanup(limit = 100, signal?: AbortSignal): Promise<number> {

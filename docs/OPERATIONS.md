@@ -73,22 +73,25 @@ Keep process-specific environment blocks separate when adding a credential. A se
 
 The worker runs every minute and:
 
-1. claims completed uploads and streams each object to verify its exact byte count and SHA-256;
+1. claims only stored uploads whose Download action requested verification, then streams each object to verify its exact byte count and SHA-256;
 2. retries transient verification failures with bounded backoff and deletes permanent mismatches;
 3. aborts multipart sessions older than 12 hours;
-4. deletes any legacy Pending uploads left from the retired grant workflow;
+4. deletes untouched stored uploads at their normal expiry and any legacy Pending uploads left from the retired grant workflow;
 5. deletes rejected/expired objects and tombstones metadata;
 6. lists incomplete multipart uploads under the exact service prefix and aborts provider uploads older than 12 hours that are absent from repository state;
 7. enforces the configured storage-time budget and per-install/IP quotas.
 
-All new automatic diagnostic archives use the same 3 GiB maximum. The control desk exposes review,
-download, and deletion only; it cannot issue upload grants, accept Pending archives, or extend
-retention. The legacy grant tables remain inert during the rollback-compatibility window, and the
-worker continues deleting any pre-removal Pending records.
+All new automatic diagnostic archives use the same 3 GiB maximum and expire 72 hours after upload.
+The control desk exposes review, on-demand verified download, and deletion only; it cannot issue
+upload grants, accept archives, or extend retention. Clicking Download atomically queues verification,
+shows its progress, and automatically starts the download after acceptance. Repeated clicks and UI
+polls do not queue duplicate verification work. Archives that are never requested are never streamed
+through the service and are deleted at normal expiry. The legacy grant tables remain inert during the
+rollback-compatibility window, and the worker continues deleting any pre-removal Pending records.
 
 Deletion is idempotent. A failed provider deletion remains queued and is retried with bounded backoff; stale `Deleting` leases are reclaimed after 15 minutes, metadata is not reported deleted until storage confirms that every exact-key version and delete marker is absent, and Expired metadata continues to consume the global retained-byte budget until that confirmation. Provider control requests use explicit deadlines, full-object verification has a size-bounded deadline, and worker shutdown cancels active work and schedules a bounded retry before the container grace period ends. Multipart reconciliation continues through the complete claimed page even when one abort fails. The provisioned one-day Backblaze noncurrent-version and incomplete-multipart lifecycle rule is defense in depth and does not replace application reconciliation.
 
-After inspecting an accepted archive, an administrator should use Delete from the control desk or `/macro-diagnostic action:Delete`. This records the actor, claims the archive with a compare-and-swap status transition, and uses the same provider-confirmed deletion and retry path as automated expiry. Routine retained storage is capped globally at 900 GiB so even a continuously full allocation remains under the accepted monthly TB-hour budget.
+After inspecting an accepted archive, an administrator should use Delete from the control desk or `/macro-diagnostic action:Delete`. This records the actor, claims the archive with a compare-and-swap status transition, and uses the same provider-confirmed deletion and retry path as automated expiry. Routine retained storage is capped globally at 900 GiB so even a continuously full allocation remains under the accepted monthly TB-hour budget. Stored-but-unrequested archives count against retained bytes but not active upload slots.
 
 ## Incident priorities
 

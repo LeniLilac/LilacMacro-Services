@@ -376,6 +376,14 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     });
     assert.equal(diagnosticsPage.statusCode, 200);
     assert.doesNotMatch(diagnosticsPage.body, /large-upload|Large-file grant/i);
+    assert.match(diagnosticsPage.body, /verified only when you request a download/);
+    const [adminScript, siteStyles] = await Promise.all([
+      app.inject({ method: 'GET', url: '/assets/admin.js' }),
+      app.inject({ method: 'GET', url: '/assets/site.css' }),
+    ]);
+    assert.match(adminScript.body, /download will start automatically when ready/);
+    assert.match(siteStyles.body, /overflow-wrap: anywhere/);
+    assert.match(siteStyles.body, /width: min\(520px, calc\(100vw - 32px\)\)/);
     const apiKeysPage = await app.inject({
       method: 'GET',
       url: '/admin/api-keys',
@@ -546,25 +554,22 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       ).statusCode,
       200,
     );
-    assert.equal(
-      (
-        await app.inject({
-          method: 'POST',
-          url: `/v1/diagnostics/uploads/${grant.id}/complete`,
-          headers: { authorization: `Bearer ${grant.authorizationToken}` },
-          payload: { parts: [{ partNumber: 1, etag: `"${'a'.repeat(32)}"` }] },
-        })
-      ).statusCode,
-      202,
-    );
-    assert.equal(await diagnosticService.verifyPending(), 1);
+    const completion = await app.inject({
+      method: 'POST',
+      url: `/v1/diagnostics/uploads/${grant.id}/complete`,
+      headers: { authorization: `Bearer ${grant.authorizationToken}` },
+      payload: { parts: [{ partNumber: 1, etag: `"${'a'.repeat(32)}"` }] },
+    });
+    assert.equal(completion.statusCode, 202);
+    assert.equal(completion.json().status, 'Verifying');
     const diagnostics = await app.inject({
       method: 'GET',
       url: '/admin/api/diagnostics',
       headers: { cookie },
     });
     assert.equal(diagnostics.statusCode, 200);
-    assert.equal(diagnostics.json()[0].status, 'Accepted');
+    assert.equal(diagnostics.json()[0].status, 'Stored');
+    assert.equal(diagnostics.json()[0].verificationActive, false);
     const downloadPath = `/admin/api/diagnostics/${grant.id}/download`;
     assert.equal(
       (
@@ -586,12 +591,21 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       ).statusCode,
       403,
     );
+    const verification = await app.inject({
+      method: 'POST',
+      url: downloadPath,
+      headers: { cookie, 'x-csrf-token': csrf },
+    });
+    assert.equal(verification.statusCode, 202);
+    assert.equal(verification.json().status, 'Verifying');
+    assert.equal(await diagnosticService.verifyPending(), 1);
     const download = await app.inject({
       method: 'POST',
       url: downloadPath,
       headers: { cookie, 'x-csrf-token': csrf },
     });
     assert.equal(download.statusCode, 200);
+    assert.equal(download.json().status, 'Accepted');
     assert.equal(download.json().url, 'https://download.invalid/archive');
     assert.equal(
       (
@@ -645,7 +659,6 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       headers: { authorization: `Bearer ${botGrant.authorizationToken}` },
       payload: { parts: [{ partNumber: 1, etag: `"${'a'.repeat(32)}"` }] },
     });
-    await diagnosticService.verifyPending();
     assert.equal(
       (
         await app.inject({

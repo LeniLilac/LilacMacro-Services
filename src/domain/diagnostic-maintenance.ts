@@ -130,6 +130,7 @@ export class DiagnosticMaintenanceService {
       const decision = decideUpload(record.request, record.createdAt);
       if (
         !(await this.repository.transition(record.id, ['VerifyingActive'], decision.status, {
+          acceptanceDeadline: null,
           audit: {
             actor: { kind: 'system', userId: '0' },
             action: 'verification.succeeded',
@@ -194,10 +195,7 @@ export class DiagnosticMaintenanceService {
   private async scheduleVerificationRetry(record: DiagnosticUploadRecord): Promise<void> {
     const attempt = record.verificationAttempts + 1;
     const now = this.clock.now();
-    if (
-      attempt >= verificationMaximumAttempts ||
-      record.createdAt.getTime() + verificationLifetimeMilliseconds <= now.getTime()
-    ) {
+    if (attempt >= verificationMaximumAttempts || verificationExpiresAt(record) <= now.getTime()) {
       if (
         !(await this.repository.transition(record.id, ['VerifyingActive'], 'Expired', {
           audit: {
@@ -258,6 +256,13 @@ export class DiagnosticMaintenanceService {
       throw removalError;
     }
   }
+}
+
+function verificationExpiresAt(record: DiagnosticUploadRecord): number {
+  return (
+    record.acceptanceDeadline?.getTime() ??
+    record.createdAt.getTime() + verificationLifetimeMilliseconds
+  );
 }
 
 export async function scheduleDeletionRetry(

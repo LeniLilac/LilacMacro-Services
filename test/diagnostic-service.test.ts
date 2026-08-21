@@ -108,7 +108,7 @@ test('global retained storage cap stays below the accepted monthly TB-hour budge
   assert.ok(decimalTerabyteHoursPerThirtyDays < 730);
 });
 
-test('routine upload is authorized, verified, accepted, and downloadable', async () => {
+test('routine upload is stored until download requests verification', async () => {
   const { service, repository, storage } = fixture();
   storage.expectedSize = 1024;
   const grant = await service.create(identity, request());
@@ -116,10 +116,18 @@ test('routine upload is authorized, verified, accepted, and downloadable', async
   assert.equal(grant.upload.kind, 'multipart');
   await assert.rejects(service.complete(grant.id, [], 'wrong'), /authorization failed/);
   await completeOnePart(service, grant, 1024);
-  assert.equal((await repository.find(grant.id))?.status, 'Verifying');
+  assert.equal((await repository.find(grant.id))?.status, 'Pending');
   assert.deepEqual(
     repository.audit.slice(0, 2).map((event) => event.action),
     ['upload.created', 'upload.completed'],
+  );
+  assert.equal(await service.verifyPending(), 0);
+  assert.deepEqual(await service.requestDownload(grant.id, { kind: 'web', userId: '123' }), {
+    status: 'Verifying',
+  });
+  assert.equal(
+    repository.audit.filter((event) => event.action === 'verification.requested').length,
+    1,
   );
   assert.equal(await service.verifyPending(), 1);
   assert.equal((await repository.find(grant.id))?.status, 'Accepted');
@@ -170,7 +178,8 @@ test('the single archive limit accepts exactly 3 GiB and rejects anything larger
     etag: `"${'a'.repeat(32)}"`,
   }));
   await service.complete(grant.id, parts, grant.authorizationToken);
-  assert.equal((await repository.find(grant.id))?.status, 'Verifying');
+  assert.equal((await repository.find(grant.id))?.status, 'Pending');
+  await service.requestDownload(grant.id, { kind: 'web', userId: '123' });
   assert.equal(await service.verifyPending(), 1);
   const record = await repository.find(grant.id);
   assert.equal(record?.status, 'Accepted');
@@ -181,6 +190,7 @@ test('administrator can delete an accepted archive and repeated deletion is idem
   storage.expectedSize = 1024;
   const grant = await service.create(identity, request());
   await completeOnePart(service, grant, 1024);
+  await service.requestDownload(grant.id, { kind: 'web', userId: '123' });
   await service.verifyPending();
 
   await service.moderate(grant.id, { kind: 'web', userId: '123' }, 'delete');
@@ -208,6 +218,7 @@ test('administrator deletion failure remains queued for cleanup retry', async ()
   storage.expectedSize = 1024;
   const grant = await service.create(identity, request());
   await completeOnePart(service, grant, 1024);
+  await service.requestDownload(grant.id, { kind: 'web', userId: '123' });
   await service.verifyPending();
   storage.failRemoval = true;
 
@@ -320,6 +331,7 @@ test('verification has a size-bounded deadline and a finite retry lifetime', asy
     });
   const grant = await service.create(identity, request());
   await completeOnePart(service, grant, 1024);
+  await service.requestDownload(grant.id, { kind: 'web', userId: '123' });
   assert.equal(await service.verifyPending(), 1);
   assert.equal((await repository.find(grant.id))?.verificationAttempts, 1);
 
@@ -353,6 +365,7 @@ test('worker shutdown cancels active verification and requeues it immediately', 
     });
   const grant = await service.create(identity, request());
   await completeOnePart(service, grant, 1024);
+  await service.requestDownload(grant.id, { kind: 'web', userId: '123' });
   const controller = new AbortController();
   const verification = service.verifyPending(1, controller.signal);
   await started;
@@ -384,6 +397,7 @@ test('worker shutdown cancels integrity-failure deletion and schedules its retry
     });
   const grant = await service.create(identity, request());
   await completeOnePart(service, grant, 1024);
+  await service.requestDownload(grant.id, { kind: 'web', userId: '123' });
   const controller = new AbortController();
   const verification = service.verifyPending(1, controller.signal);
   await removalStarted;
@@ -421,9 +435,56 @@ test('full-object mismatch is audited and deleted before acceptance', async () =
   };
   const grant = await service.create(identity, request());
   await completeOnePart(service, grant, 1024);
+  await service.requestDownload(grant.id, { kind: 'web', userId: '123' });
   assert.equal(await service.verifyPending(), 1);
   assert.equal((await repository.find(grant.id))?.status, 'Invalid');
   assert.ok(repository.audit.some((event) => event.action === 'verification.failed'));
   assert.ok(repository.audit.some((event) => event.action === 'deletion.succeeded'));
   assert.equal(storage.removed.length, 1);
+});
+
+test('untouched stored uploads expire without full-object verification', async () => {
+  const { service, repository, storage, clock } = fixture();
+  storage.expectedSize = 1024;
+  let verificationCalls = 0;
+  storage.verifyObject = async () => {
+    verificationCalls += 1;
+  };
+  const grant = await service.create(identity, request());
+  await completeOnePart(service, grant, 1024);
+
+  assert.equal(await service.verifyPending(), 0);
+  clock.advance(73 * 60 * 60 * 1000);
+  assert.equal(await service.cleanup(), 1);
+  assert.equal((await repository.find(grant.id))?.status, 'Deleted');
+  assert.equal(verificationCalls, 0);
+});
+
+test('download verification request is idempotent and excludes legacy Pending records', async () => {
+  const { service, repository, storage, now } = fixture();
+  storage.expectedSize = 1024;
+  const grant = await service.create(identity, request());
+  await completeOnePart(service, grant, 1024);
+  const actor = { kind: 'web' as const, userId: '123' };
+
+  assert.deepEqual(
+    await Promise.all([
+      service.requestDownload(grant.id, actor),
+      service.requestDownload(grant.id, actor),
+    ]),
+    [{ status: 'Verifying' }, { status: 'Verifying' }],
+  );
+  assert.equal(
+    repository.audit.filter((event) => event.action === 'verification.requested').length,
+    1,
+  );
+
+  const legacy = await service.create(
+    { installPseudonym: 'legacy-install', networkPseudonym: 'legacy-network' },
+    { ...request(), fileName: 'legacy.zip' },
+  );
+  await repository.transition(legacy.id, ['Uploading'], 'Pending', {
+    acceptanceDeadline: new Date(now.getTime() + 60_000),
+  });
+  await assert.rejects(service.requestDownload(legacy.id, actor), /unavailable for download/);
 });

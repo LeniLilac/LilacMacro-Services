@@ -123,10 +123,12 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
   ): Promise<boolean> {
     if (this.records.has(record.id)) throw new Error('Diagnostic record already exists.');
     const recent = [...this.records.values()].filter((item) => item.createdAt >= since);
-    const active = recent.filter((item) =>
-      ['Uploading', 'Completing', 'Verifying', 'VerifyingActive', 'Pending', 'Deleting'].includes(
-        item.status,
-      ),
+    const active = recent.filter(
+      (item) =>
+        ['Uploading', 'Completing', 'Verifying', 'VerifyingActive', 'Deleting'].includes(
+          item.status,
+        ) ||
+        (item.status === 'Pending' && item.acceptanceDeadline !== null),
     );
     const install = recent.filter((item) => item.installPseudonym === record.installPseudonym);
     const network = recent.filter((item) => item.networkPseudonym === record.networkPseudonym);
@@ -314,10 +316,12 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
             (record.status === 'Completing' &&
               record.updatedAt.getTime() + 12 * 60 * 60 * 1000 <= now.getTime()) ||
             (record.status === 'Verifying' &&
-              (record.createdAt.getTime() + 24 * 60 * 60 * 1000 <= now.getTime() ||
+              ((record.acceptanceDeadline?.getTime() ??
+                record.createdAt.getTime() + 24 * 60 * 60 * 1000) <= now.getTime() ||
                 record.verificationAttempts >= 8)) ||
             (record.status === 'VerifyingActive' &&
-              (record.createdAt.getTime() + 24 * 60 * 60 * 1000 <= now.getTime() ||
+              ((record.acceptanceDeadline?.getTime() ??
+                record.createdAt.getTime() + 24 * 60 * 60 * 1000) <= now.getTime() ||
                 record.verificationAttempts >= 8)) ||
             record.status === 'Expired' ||
             (record.status === 'Failed' &&

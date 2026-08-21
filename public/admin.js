@@ -1,6 +1,7 @@
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 let state;
 let commandPending = false;
+const activeDiagnosticDownloads = new Set();
 const featureIds = [
   'mode.story',
   'mode.raid',
@@ -161,12 +162,18 @@ async function loadDiagnostics() {
 function diagnosticActions(record) {
   const node = document.createElement('td');
   node.className = 'row-actions';
-  if (record.status === 'Accepted')
-    node.append(
-      actionButton('Download', () => downloadDiagnostic(record)),
-      actionButton('Delete', () => moderate(record, 'delete'), true),
-    );
-  else if (['Uploading', 'Verifying', 'Failed', 'Expired'].includes(record.status))
+  if (activeDiagnosticDownloads.has(record.id)) {
+    const verifying = actionButton('Verifying…', () => undefined);
+    verifying.disabled = true;
+    verifying.setAttribute('aria-busy', 'true');
+    node.append(verifying);
+    return node;
+  }
+  if (['Accepted', 'Stored', 'Verifying'].includes(record.status)) {
+    node.append(actionButton('Download', () => downloadDiagnostic(record)));
+    if (!record.verificationActive)
+      node.append(actionButton('Delete', () => moderate(record, 'delete'), true));
+  } else if (['Uploading', 'Failed', 'Expired'].includes(record.status))
     node.append(actionButton('Delete', () => moderate(record, 'delete'), true));
   else node.textContent = '—';
   return node;
@@ -189,15 +196,41 @@ async function moderate(record, action) {
 }
 
 async function downloadDiagnostic(record) {
+  if (activeDiagnosticDownloads.has(record.id)) return;
+  activeDiagnosticDownloads.add(record.id);
   try {
-    const result = await request(
-      `/admin/api/diagnostics/${encodeURIComponent(record.id)}/download`,
-      { method: 'POST' },
-    );
-    location.assign(result.url);
+    await loadDiagnostics();
+    const startedAt = Date.now();
+    let delayMilliseconds = 3000;
+    let announced = false;
+    while (Date.now() - startedAt < 2 * 60 * 60 * 1000) {
+      const result = await request(
+        `/admin/api/diagnostics/${encodeURIComponent(record.id)}/download`,
+        { method: 'POST' },
+      );
+      if (result.status === 'Accepted') {
+        location.assign(result.url);
+        return;
+      }
+      if (!announced) {
+        notice('Verification queued. The download will start automatically when ready.');
+        announced = true;
+      }
+      await loadDiagnostics();
+      await wait(delayMilliseconds);
+      delayMilliseconds = Math.min(15_000, delayMilliseconds + 2000);
+    }
+    notice('Verification is still running. Click Download to resume waiting.', true);
   } catch (error) {
     notice(error.message, true);
+  } finally {
+    activeDiagnosticDownloads.delete(record.id);
+    await loadDiagnostics().catch(() => undefined);
   }
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function loadTelemetry() {

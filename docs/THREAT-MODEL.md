@@ -31,7 +31,7 @@ Configuration shares are untrusted opaque data. The API accepts only a bounded b
 | Upload cost abuse               | Explicit consent, declared-size cap, quotas, trusted-edge client identity, rotating HMAC pseudonyms                                            |
 | Credential exposure             | Doppler injection, redaction, no secret response bodies, no signed URL logging, private bucket                                                 |
 | Path/object traversal           | server-generated UUID object keys, prefix checks, no caller-selected filesystem/object path                                                    |
-| Multipart confusion             | scoped token; exact part size/checksum grants; streamed full-object size and SHA-256 before acceptance                                         |
+| Multipart confusion             | scoped token; exact part size/checksum grants; assembled-size check; on-demand streamed full-object size and SHA-256 before download           |
 | Archive bombs/malware           | never auto-extract; quarantine metadata; admin download only; content disposition attachment                                                   |
 | Stolen administrator API key    | 256-bit random secret, hash-only storage, closed read scopes, short expiry, revocation, rate limits, no mutation or archive-download authority |
 | Share guessing or storage abuse | Random bearer codes, strict alphabet/size bounds, per-network and global count/byte quotas, no-store, 30-day expiry, bounded deletion          |

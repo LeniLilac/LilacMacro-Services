@@ -111,12 +111,11 @@ function registerDiagnosticAdminRoutes(
   app.post('/admin/api/diagnostics/:id/download', async (request, reply) => {
     const actor = await authorizeAdmin(request, reply, auth, true);
     if (!actor) return;
-    return {
-      url: await dependencies.diagnosticService.downloadUrl(
-        idSchema.parse((request.params as { id?: unknown }).id),
-        { kind: 'web', userId: actor.userId },
-      ),
-    };
+    const result = await dependencies.diagnosticService.requestDownload(
+      idSchema.parse((request.params as { id?: unknown }).id),
+      { kind: 'web', userId: actor.userId },
+    );
+    return reply.code(result.status === 'Accepted' ? 200 : 202).send(result);
   });
 }
 
@@ -254,7 +253,13 @@ function serializeDiagnostics(records: Awaited<ReturnType<DiagnosticService['lis
     sizeBytes: record.request.sizeBytes,
     kind: record.request.kind,
     appVersion: record.request.appVersion,
-    status: record.status,
+    status:
+      record.status === 'Pending' && record.acceptanceDeadline === null
+        ? 'Stored'
+        : record.status === 'VerifyingActive'
+          ? 'Verifying'
+          : record.status,
+    verificationActive: record.status === 'VerifyingActive',
     createdAt: record.createdAt.toISOString(),
     expiresAt: record.expiresAt.toISOString(),
   }));

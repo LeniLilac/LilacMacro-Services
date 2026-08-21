@@ -48,12 +48,17 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
         `SELECT
           count(*) FILTER (WHERE install_pseudonym = $1) AS install_count,
           count(*) FILTER (WHERE network_pseudonym = $2) AS network_count,
-            count(*) FILTER (WHERE install_pseudonym = $1 AND status IN ('Uploading','Completing','Verifying','VerifyingActive','Pending','Deleting')) AS install_active,
-            count(*) FILTER (WHERE network_pseudonym = $2 AND status IN ('Uploading','Completing','Verifying','VerifyingActive','Pending','Deleting')) AS network_active,
+            count(*) FILTER (WHERE install_pseudonym = $1 AND
+              (status IN ('Uploading','Completing','Verifying','VerifyingActive','Deleting') OR
+               (status = 'Pending' AND acceptance_deadline IS NOT NULL))) AS install_active,
+            count(*) FILTER (WHERE network_pseudonym = $2 AND
+              (status IN ('Uploading','Completing','Verifying','VerifyingActive','Deleting') OR
+               (status = 'Pending' AND acceptance_deadline IS NOT NULL))) AS network_active,
           COALESCE(sum((request->>'sizeBytes')::bigint) FILTER (WHERE install_pseudonym = $1), 0) AS install_bytes,
           COALESCE(sum((request->>'sizeBytes')::bigint) FILTER (WHERE network_pseudonym = $2), 0) AS network_bytes,
           count(*) AS global_count,
-          count(*) FILTER (WHERE status IN ('Uploading','Completing','Verifying','VerifyingActive','Pending','Deleting')) AS global_active,
+          count(*) FILTER (WHERE status IN ('Uploading','Completing','Verifying','VerifyingActive','Deleting') OR
+            (status = 'Pending' AND acceptance_deadline IS NOT NULL)) AS global_active,
           COALESCE(sum((request->>'sizeBytes')::bigint), 0) AS global_bytes,
           (SELECT COALESCE(sum((request->>'sizeBytes')::bigint), 0)
              FROM diagnostic_uploads retained
@@ -308,7 +313,8 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
                   OR (status = 'Uploading' AND created_at <= $1 - interval '12 hours')
                   OR (status = 'Completing' AND updated_at <= $1 - interval '12 hours')
                   OR (status IN ('Verifying','VerifyingActive') AND
-                      (created_at <= $1 - interval '24 hours' OR verification_attempts >= 8))
+                      (COALESCE(acceptance_deadline, created_at + interval '24 hours') <= $1 OR
+                       verification_attempts >= 8))
                   OR status = 'Expired'
                   OR (status = 'Failed' AND
                       (next_deletion_attempt_at IS NULL OR next_deletion_attempt_at <= $1)))
