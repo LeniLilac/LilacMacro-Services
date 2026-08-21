@@ -154,15 +154,17 @@ test('bot boundary denies non-admins and redacts unexpected command errors', asy
 
 test('bot diagnostic delete is administrator-only and forwarded to the private API', async () => {
   const diagnosticCommand = botCommands.find((command) => command.name === 'macro-diagnostic');
-  const actionOption = diagnosticCommand?.options?.find((option) => option.name === 'action');
-  assert.ok(actionOption && 'choices' in actionOption);
-  assert.ok(actionOption.choices?.some((choice) => choice.value === 'delete'));
+  assert.ok(diagnosticCommand);
+  assert.equal(
+    diagnosticCommand.options?.some((option) => option.name === 'action'),
+    false,
+  );
 
   let forwarded: unknown = null;
   let edited = '';
   const request = {
     ...interaction('macro-diagnostic', {
-      strings: { action: 'delete', 'upload-id': '11111111-1111-4111-8111-111111111111' },
+      strings: { 'upload-id': '11111111-1111-4111-8111-111111111111' },
     }),
     deferReply: async () => undefined,
     editReply: async (value: string) => {

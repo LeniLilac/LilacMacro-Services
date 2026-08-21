@@ -25,51 +25,13 @@
         <div>
           <div class="eyebrow">PRIVATE SUPPORT DATA</div>
           <h1>Diagnostics</h1>
-          <p>Review time-limited archives and issue exact-size grants only when needed.</p>
+          <p>Review and delete time-limited automatic diagnostic archives.</p>
         </div>
         <button class="button small" id="refresh-diagnostics" type="button">Refresh</button>
       </section>
       <div id="notice" class="notice" role="status" hidden></div>
       <section class="admin-grid single-purpose">
         <article class="panel panel-wide">
-          <form id="large-upload-form" class="large-upload-form" autocomplete="off">
-            <label
-              ><span>Installation ID</span
-              ><input
-                name="installId"
-                maxlength="36"
-                placeholder="00000000-0000-0000-0000-000000000000"
-                required /></label
-            ><label
-              ><span>Exact archive size (bytes)</span
-              ><input
-                name="sizeBytes"
-                type="number"
-                min="3221225473"
-                max="32212254720"
-                required /></label
-            ><label
-              ><span>Archive kind</span
-              ><select name="kind">
-                <option value="deep-debug">Deep debug</option>
-                <option value="live-debug">Live debug</option>
-                <option value="runtime-log">Runtime log</option>
-                <option value="installer-log">Installer log</option>
-              </select></label
-            ><button class="button primary" type="submit">Issue 30-minute grant</button>
-          </form>
-          <div id="large-upload-result" class="grant-result" hidden>
-            <div><strong>Large-file grant</strong><span id="large-upload-expiry"></span></div>
-            <textarea
-              id="large-upload-grant"
-              rows="3"
-              readonly
-              aria-label="Large-file grant"
-            ></textarea
-            ><button class="button small" id="copy-large-upload-grant" type="button">
-              Copy grant
-            </button>
-          </div>
           <div class="table-scroll">
             <table>
               <thead>

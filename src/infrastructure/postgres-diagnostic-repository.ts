@@ -12,7 +12,6 @@ import type {
   DiagnosticQuotaLimits,
   DiagnosticRepository,
   DiagnosticUploadRecord,
-  LargeUploadGrantRecord,
 } from '../domain/ports.js';
 import { insertDiagnosticAudit, mapDiagnostic } from './postgres-diagnostic-mappers.js';
 
@@ -24,7 +23,6 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
     since: Date,
     limits: DiagnosticQuotaLimits,
     audit: DiagnosticAuditEvent,
-    largeUploadGrantId?: string,
   ): Promise<boolean> {
     const client = await this.pool.connect();
     try {
@@ -80,33 +78,6 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
         await client.query('ROLLBACK');
         return false;
       }
-      if (largeUploadGrantId) {
-        const consumed = await client.query(
-          `UPDATE diagnostic_large_upload_grants SET consumed_at = $2
-           WHERE id = $1 AND upload_id = $3 AND object_key = $4
-             AND install_pseudonym = $5 AND size_bytes = $6 AND kind = $7
-             AND consumed_at IS NULL AND expires_at > $2`,
-          [
-            largeUploadGrantId,
-            record.createdAt,
-            record.id,
-            record.objectKey,
-            record.installPseudonym,
-            record.request.sizeBytes,
-            record.request.kind,
-          ],
-        );
-        if (consumed.rowCount !== 1) {
-          await client.query('ROLLBACK');
-          return false;
-        }
-        await client.query(
-          `INSERT INTO diagnostic_large_upload_grant_audit
-           (grant_id, actor_kind, actor_id, action, details, created_at)
-           VALUES ($1, 'system', '0', 'grant.consumed', $2::jsonb, $3)`,
-          [largeUploadGrantId, JSON.stringify({ uploadId: record.id }), record.createdAt],
-        );
-      }
       await client.query(
         `INSERT INTO diagnostic_uploads
          (id, object_key, install_pseudonym, network_pseudonym, request, status, provider_upload_id,
@@ -128,58 +99,6 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
       await insertDiagnosticAudit(client, record.id, audit);
       await client.query('COMMIT');
       return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  public async issueLargeUploadGrant(record: LargeUploadGrantRecord): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(
-        `INSERT INTO diagnostic_large_upload_grants
-         (id, upload_id, object_key, install_pseudonym, key_epoch, size_bytes, kind,
-          issuer_kind, issuer_id, expires_at, consumed_at, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-        [
-          record.id,
-          record.uploadId,
-          record.objectKey,
-          record.installPseudonym,
-          record.keyEpoch,
-          record.sizeBytes,
-          record.kind,
-          record.issuer.kind,
-          record.issuer.userId,
-          record.expiresAt,
-          record.consumedAt,
-          record.createdAt,
-        ],
-      );
-      await client.query(
-        `INSERT INTO diagnostic_large_upload_grant_audit
-         (grant_id, actor_kind, actor_id, action, details, created_at)
-         VALUES ($1,$2,$3,'grant.issued',$4::jsonb,$5)`,
-        [
-          record.id,
-          record.issuer.kind,
-          record.issuer.userId,
-          JSON.stringify({
-            uploadId: record.uploadId,
-            installPseudonym: record.installPseudonym,
-            keyEpoch: record.keyEpoch,
-            sizeBytes: record.sizeBytes,
-            kind: record.kind,
-            expiresAt: record.expiresAt.toISOString(),
-          }),
-          record.createdAt,
-        ],
-      );
-      await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

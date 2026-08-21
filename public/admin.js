@@ -161,12 +161,7 @@ async function loadDiagnostics() {
 function diagnosticActions(record) {
   const node = document.createElement('td');
   node.className = 'row-actions';
-  if (record.status === 'Pending')
-    node.append(
-      actionButton('Accept', () => moderate(record, 'accept')),
-      actionButton('Reject', () => moderate(record, 'reject'), true),
-    );
-  else if (record.status === 'Accepted')
+  if (record.status === 'Accepted')
     node.append(
       actionButton('Download', () => downloadDiagnostic(record)),
       actionButton('Delete', () => moderate(record, 'delete'), true),
@@ -178,8 +173,7 @@ function diagnosticActions(record) {
 }
 
 async function moderate(record, action) {
-  const verb =
-    action === 'accept' ? 'Accept' : action === 'reject' ? 'Reject and delete' : 'Delete';
+  const verb = 'Delete';
   if (!(await confirmAction(`${verb} “${record.fileName}” (${formatBytes(record.sizeBytes)})?`)))
     return;
   try {
@@ -204,24 +198,6 @@ async function downloadDiagnostic(record) {
   } catch (error) {
     notice(error.message, true);
   }
-}
-
-async function issueLargeUploadGrant(formElement) {
-  const form = new FormData(formElement);
-  const result = await request('/admin/api/diagnostics/large-upload-grants', {
-    method: 'POST',
-    body: JSON.stringify({
-      installId: form.get('installId'),
-      sizeBytes: Number(form.get('sizeBytes')),
-      kind: form.get('kind'),
-    }),
-  });
-  document.querySelector('#large-upload-grant').value = result.grant;
-  document.querySelector('#large-upload-expiry').textContent =
-    `Expires ${formatDate(result.expiresAt)}`;
-  document.querySelector('#large-upload-result').hidden = false;
-  formElement.reset();
-  notice('Large-file grant issued. Send it only to the user who supplied this installation ID.');
 }
 
 async function loadTelemetry() {
@@ -434,12 +410,6 @@ const diagnosticRows = document.querySelector('#diagnostic-rows');
 if (diagnosticRows) {
   document.querySelector('#refresh-diagnostics').onclick = () =>
     void loadDiagnostics().catch((error) => notice(error.message, true));
-  document.querySelector('#large-upload-form').onsubmit = (event) => {
-    event.preventDefault();
-    void issueLargeUploadGrant(event.currentTarget).catch((error) => notice(error.message, true));
-  };
-  document.querySelector('#copy-large-upload-grant').onclick = () =>
-    void copyValue('#large-upload-grant', 'Large-file grant copied.');
 }
 const telemetryRows = document.querySelector('#telemetry-rows');
 if (telemetryRows)

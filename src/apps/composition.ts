@@ -16,7 +16,6 @@ import {
 } from '../infrastructure/config.js';
 import { GitHubReleaseProbe } from '../infrastructure/github-release.js';
 import { InternalApiClient } from '../infrastructure/internal-api-client.js';
-import { HmacLargeUploadAuthorizer } from '../infrastructure/large-upload-authorizer.js';
 import {
   PostgresControlRepository,
   PostgresDiagnosticRepository,
@@ -51,7 +50,6 @@ export function composeApiServices() {
       config.INTERNAL_CONTROL_ORIGIN,
       config.INTERNAL_API_TOKEN_BASE64,
     ),
-    largeUploadAuthorizer: new HmacLargeUploadAuthorizer(config.LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64),
     diagnosticService: composeDiagnosticService(
       config,
       diagnosticRepository,

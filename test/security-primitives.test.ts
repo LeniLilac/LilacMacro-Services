@@ -9,7 +9,6 @@ import {
   verifyCsrfToken,
 } from '../src/infrastructure/session-codec.js';
 import { HmacUploadAuthorizer } from '../src/infrastructure/upload-authorizer.js';
-import { HmacLargeUploadAuthorizer } from '../src/infrastructure/large-upload-authorizer.js';
 import { createPostgresRoleProvisionStatement } from '../src/infrastructure/scram-verifier.js';
 
 test('OAuth PKCE attempt has bounded one-time material', () => {
@@ -40,44 +39,6 @@ test('upload token binds id, key, and expiry', () => {
   assert.equal(authorizer.verify(token, randomUUID(), key, now), false);
   assert.equal(authorizer.verify(token, id, `${key}x`, now), false);
   assert.equal(authorizer.verify(token, id, key, new Date(now.getTime() + 60_001)), false);
-});
-
-test('large-upload grant binds installation, size, kind, and a short expiry', () => {
-  const authorizer = new HmacLargeUploadAuthorizer(randomBytes(32).toString('base64'));
-  const now = new Date('2026-08-14T12:00:00.000Z');
-  const payload = {
-    grantId: randomUUID(),
-    uploadId: randomUUID(),
-    objectKey: `diagnostics/test/${randomUUID()}.zip`,
-    installPseudonym: 'install-pseudonym',
-    sizeBytes: 4_000_000_000,
-    kind: 'live-debug' as const,
-  };
-  const token = authorizer.issue(payload, new Date(now.getTime() + 60_000));
-  assert.equal(
-    authorizer.verify(token, payload.installPseudonym, payload.sizeBytes, payload.kind, now)
-      ?.grantId,
-    payload.grantId,
-  );
-  assert.equal(authorizer.verify(token, 'another', payload.sizeBytes, payload.kind, now), null);
-  assert.equal(
-    authorizer.verify(token, payload.installPseudonym, payload.sizeBytes + 1, payload.kind, now),
-    null,
-  );
-  assert.equal(
-    authorizer.verify(token, payload.installPseudonym, payload.sizeBytes, 'deep-debug', now),
-    null,
-  );
-  assert.equal(
-    authorizer.verify(
-      token,
-      payload.installPseudonym,
-      payload.sizeBytes,
-      payload.kind,
-      new Date(now.getTime() + 60_001),
-    ),
-    null,
-  );
 });
 
 test('pseudonyms rotate monthly and never expose source identifiers', () => {

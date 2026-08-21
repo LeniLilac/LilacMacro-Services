@@ -19,7 +19,6 @@ import { TrustedProxyAddressResolver } from '../src/infrastructure/trusted-proxy
 import { Ed25519SnapshotSigner } from '../src/infrastructure/snapshot-signer.js';
 import { hashSessionToken, issueCsrfToken } from '../src/infrastructure/session-codec.js';
 import { HmacUploadAuthorizer } from '../src/infrastructure/upload-authorizer.js';
-import { HmacLargeUploadAuthorizer } from '../src/infrastructure/large-upload-authorizer.js';
 import { startTemporaryPostgres } from './helpers/postgres.js';
 
 class ApiStorage implements UploadStorage {
@@ -76,7 +75,6 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     SESSION_CSRF_HMAC_KEY_BASE64: csrfKey,
     OAUTH_STATE_ENCRYPTION_KEY_BASE64: key(),
     UPLOAD_AUTH_HMAC_KEY_BASE64: key(),
-    LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64: key(),
     INSTALL_PSEUDONYM_HMAC_KEY_BASE64: key(),
     NETWORK_PSEUDONYM_HMAC_KEY_BASE64: key(),
     CONTROL_SIGNING_PRIVATE_KEY_BASE64: signing.privateKey
@@ -137,7 +135,6 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       config.INSTALL_PSEUDONYM_HMAC_KEY_BASE64,
       config.NETWORK_PSEUDONYM_HMAC_KEY_BASE64,
     ),
-    largeUploadAuthorizer: new HmacLargeUploadAuthorizer(config.LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64),
   });
 
   try {
@@ -367,9 +364,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       headers: { cookie },
     });
     assert.equal(diagnosticsPage.statusCode, 200);
-    assert.match(diagnosticsPage.body, /id="large-upload-form"/);
-    assert.match(diagnosticsPage.body, /autocomplete="off"/);
-    assert.match(diagnosticsPage.body, /Exact archive size \(bytes\)/);
+    assert.doesNotMatch(diagnosticsPage.body, /large-upload|Large-file grant/i);
     const apiKeysPage = await app.inject({
       method: 'GET',
       url: '/admin/api-keys',
@@ -704,15 +699,8 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
           payload: { installId: largeInstallId, sizeBytes: largeSize, kind: 'live-debug' },
         })
       ).statusCode,
-      403,
+      404,
     );
-    const largeGrantResponse = await app.inject({
-      method: 'POST',
-      url: '/admin/api/diagnostics/large-upload-grants',
-      headers: { cookie, 'x-csrf-token': csrf },
-      payload: { installId: largeInstallId, sizeBytes: largeSize, kind: 'live-debug' },
-    });
-    assert.equal(largeGrantResponse.statusCode, 201);
     const largeRequest = {
       installId: largeInstallId,
       fileName: 'live-debug.zip',
@@ -721,22 +709,27 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       kind: 'live-debug',
       explicitConsent: true,
       appVersion: '1.0.115',
-      largeUploadGrant: largeGrantResponse.json().grant,
     };
     assert.equal(
       (await app.inject({ method: 'POST', url: '/v1/diagnostics/uploads', payload: largeRequest }))
         .statusCode,
-      201,
+      400,
     );
-    assert.notEqual(
-      (await app.inject({ method: 'POST', url: '/v1/diagnostics/uploads', payload: largeRequest }))
-        .statusCode,
-      201,
+    assert.equal(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/v1/diagnostics/uploads',
+          payload: {
+            ...largeRequest,
+            fileName: 'installer-log.zip',
+            sizeBytes: 1,
+            kind: 'installer-log',
+          },
+        })
+      ).statusCode,
+      400,
     );
-    const persistedGrant = [...diagnosticRepository.largeUploadGrants.values()][0];
-    assert.equal(persistedGrant?.issuer.userId, '123456789012345678');
-    assert.ok(persistedGrant?.consumedAt);
-    assert.doesNotMatch(JSON.stringify(persistedGrant), new RegExp(largeInstallId, 'i'));
   } finally {
     await app.close();
     await postgres.stop();

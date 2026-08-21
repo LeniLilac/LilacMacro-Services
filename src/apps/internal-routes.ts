@@ -42,7 +42,7 @@ const moderationSchema = z
   .object({
     uploadId: z.uuid(),
     actorId: z.string().regex(/^\d+$/),
-    action: z.enum(['accept', 'reject', 'delete']),
+    action: z.literal('delete'),
   })
   .strict();
 

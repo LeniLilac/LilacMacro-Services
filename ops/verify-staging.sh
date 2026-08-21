@@ -57,7 +57,6 @@ internal_worker="$(random_base64)"
 session_key="$(random_base64)"
 oauth_key="$(random_base64)"
 upload_key="$(random_base64)"
-large_upload_key="$(random_base64)"
 install_key="$(random_base64)"
 network_key="$(random_base64)"
 
@@ -91,7 +90,6 @@ MACRO_ADMIN_IDS=123456789012345678
 SESSION_CSRF_HMAC_KEY_BASE64=${session_key}
 OAUTH_STATE_ENCRYPTION_KEY_BASE64=${oauth_key}
 UPLOAD_AUTH_HMAC_KEY_BASE64=${upload_key}
-LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64=${large_upload_key}
 INSTALL_PSEUDONYM_HMAC_KEY_BASE64=${install_key}
 NETWORK_PSEUDONYM_HMAC_KEY_BASE64=${network_key}
 CLOUDFLARE_TUNNEL_TOKEN=staging-not-connected

@@ -10,13 +10,12 @@ import {
   DiagnosticMaintenanceService,
   verificationDeadlineMilliseconds,
 } from './diagnostic-maintenance.js';
-import { decideUpload, diagnosticQuotaLimits, extendRetention } from './diagnostic-policy.js';
+import { decideUpload, diagnosticQuotaLimits } from './diagnostic-policy.js';
 import type {
   Actor,
   DiagnosticAuditRecord,
   DiagnosticRepository,
   DiagnosticUploadRecord,
-  LargeUploadGrantRecord,
 } from './ports.js';
 
 export interface UploadStorage {
@@ -56,29 +55,21 @@ export interface AbuseIdentity {
   networkPseudonym: string;
 }
 
-export interface LargeUploadAuthorization {
-  grantId: string;
-  uploadId: string;
-  objectKey: string;
-}
-
 export interface UploadGrant {
   id: string;
   authorizationToken: string;
   status: string;
   expiresAt: string;
-  acceptanceDeadline: string | null;
   upload: { kind: 'multipart'; uploadId: string; partSizeBytes: number; partCount: number };
 }
 
 export interface UploadStatusView {
   id: string;
   status: DiagnosticUploadRecord['status'];
-  acceptanceDeadline: string | null;
   expiresAt: string;
 }
 
-export type DiagnosticModerationAction = 'accept' | 'reject' | 'delete';
+export type DiagnosticModerationAction = 'delete';
 
 export interface UploadAuthorizer {
   issue(id: string, objectKey: string, expiresAt: Date): string;
@@ -106,16 +97,12 @@ export class DiagnosticService {
     );
   }
 
-  public async create(
-    identity: AbuseIdentity,
-    input: unknown,
-    largeUploadAuthorization: LargeUploadAuthorization | null = null,
-  ): Promise<UploadGrant> {
+  public async create(identity: AbuseIdentity, input: unknown): Promise<UploadGrant> {
     const request: PersistedUploadRequest = persistedUploadRequestSchema.parse(input);
     const now = this.clock.now();
-    const decision = decideUpload(request, now, largeUploadAuthorization !== null);
-    const id = largeUploadAuthorization?.uploadId ?? randomUUID();
-    const objectKey = largeUploadAuthorization?.objectKey ?? this.objectKey(id, now);
+    const decision = decideUpload(request, now);
+    const id = randomUUID();
+    const objectKey = this.objectKey(id, now);
     const record: DiagnosticUploadRecord = {
       id,
       objectKey,
@@ -143,18 +130,12 @@ export class DiagnosticService {
         details: {
           kind: request.kind,
           sizeBytes: request.sizeBytes,
-          manualGrant: largeUploadAuthorization !== null,
         },
         createdAt: now,
       },
-      largeUploadAuthorization?.grantId,
     );
     if (!reserved) {
-      throw new Error(
-        largeUploadAuthorization
-          ? 'Diagnostic upload grant or quota was not available.'
-          : 'Diagnostic upload quota was exceeded.',
-      );
+      throw new Error('Diagnostic upload quota was exceeded.');
     }
 
     let providerUploadId: string | null = null;
@@ -192,7 +173,6 @@ export class DiagnosticService {
       authorizationToken,
       status: 'Uploading',
       expiresAt: decision.expiresAt.toISOString(),
-      acceptanceDeadline: null,
       upload: {
         kind: 'multipart',
         uploadId: providerUploadId,
@@ -200,33 +180,6 @@ export class DiagnosticService {
         partCount: decision.partCount,
       },
     };
-  }
-
-  public async issueLargeUploadGrant(
-    actor: Actor,
-    installPseudonym: string,
-    keyEpoch: string,
-    sizeBytes: number,
-    kind: PersistedUploadRequest['kind'],
-  ): Promise<LargeUploadGrantRecord> {
-    if (actor.kind === 'system') throw new Error('Large-upload grants require an administrator.');
-    const now = this.clock.now();
-    const record: LargeUploadGrantRecord = {
-      id: randomUUID(),
-      uploadId: randomUUID(),
-      objectKey: '',
-      installPseudonym,
-      keyEpoch,
-      sizeBytes,
-      kind,
-      issuer: actor,
-      expiresAt: new Date(now.getTime() + 30 * 60_000),
-      consumedAt: null,
-      createdAt: now,
-    };
-    record.objectKey = this.objectKey(record.uploadId, now);
-    await this.repository.issueLargeUploadGrant(record);
-    return structuredClone(record);
   }
 
   public async partUrl(
@@ -237,7 +190,7 @@ export class DiagnosticService {
   ): Promise<string> {
     const record = await this.requireUploading(id);
     this.authorize(record, token);
-    const decision = decideUpload(record.request, record.createdAt, true);
+    const decision = decideUpload(record.request, record.createdAt);
     if (
       !decision.partSizeBytes ||
       !Number.isInteger(partNumber) ||
@@ -305,53 +258,11 @@ export class DiagnosticService {
     id: string,
     actor: Actor,
     action: DiagnosticModerationAction,
-    requestedUntil?: Date,
   ): Promise<void> {
-    const now = this.clock.now();
     const record = await this.repository.find(id);
     if (!record) throw new Error('Diagnostic upload was not found.');
-    if (action === 'delete') {
-      await this.maintenance.requestDeletionByAdministrator(record, actor);
-      return;
-    }
-    if (
-      record.status !== 'Pending' ||
-      record.acceptanceDeadline === null ||
-      record.acceptanceDeadline <= now
-    )
-      throw new Error('Diagnostic upload is not pending.');
-    if (action === 'reject') {
-      if (
-        !(await this.repository.transition(id, ['Pending'], 'Expired', {
-          acceptanceDeadlineAfter: now,
-          audit: {
-            actor,
-            action: 'moderation.reject',
-            details: {},
-            createdAt: now,
-          },
-        }))
-      ) {
-        throw new Error('Diagnostic moderation conflicted with another request.');
-      }
-      return;
-    }
-    const expiry = requestedUntil ? extendRetention(now, requestedUntil) : record.expiresAt;
-    if (
-      !(await this.repository.transition(id, ['Pending'], 'Accepted', {
-        acceptanceDeadlineAfter: now,
-        expiresAt: expiry,
-        acceptanceDeadline: null,
-        audit: {
-          actor,
-          action: 'moderation.accept',
-          details: { retainUntil: expiry.toISOString() },
-          createdAt: now,
-        },
-      }))
-    ) {
-      throw new Error('Diagnostic moderation conflicted with another request.');
-    }
+    if (action !== 'delete') throw new Error('Diagnostic moderation action is unsupported.');
+    await this.maintenance.requestDeletionByAdministrator(record, actor);
   }
 
   public async list(limit = 100): Promise<DiagnosticUploadRecord[]> {
@@ -365,7 +276,6 @@ export class DiagnosticService {
     return {
       id: record.id,
       status: record.status,
-      acceptanceDeadline: record.acceptanceDeadline?.toISOString() ?? null,
       expiresAt: record.expiresAt.toISOString(),
     };
   }
@@ -439,7 +349,7 @@ function validateParts(
   parts: ReadonlyArray<{ partNumber: number; etag: string }>,
   record: DiagnosticUploadRecord,
 ): ReadonlyArray<{ partNumber: number; etag: string; checksumSha256: string }> {
-  const decision = decideUpload(record.request, record.createdAt, true);
+  const decision = decideUpload(record.request, record.createdAt);
   const expected = decision.partCount;
   if (parts.length !== expected)
     throw new Error('Multipart completion did not include every declared part.');

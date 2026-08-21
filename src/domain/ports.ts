@@ -60,20 +60,6 @@ export interface DiagnosticUploadRecord {
   updatedAt: Date;
 }
 
-export interface LargeUploadGrantRecord {
-  id: string;
-  uploadId: string;
-  objectKey: string;
-  installPseudonym: string;
-  keyEpoch: string;
-  sizeBytes: number;
-  kind: PersistedUploadRequest['kind'];
-  issuer: Actor;
-  expiresAt: Date;
-  consumedAt: Date | null;
-  createdAt: Date;
-}
-
 export interface DiagnosticAuditEvent {
   actor: Actor;
   action:
@@ -117,9 +103,7 @@ export interface DiagnosticRepository {
     since: Date,
     limits: DiagnosticQuotaLimits,
     audit: DiagnosticAuditEvent,
-    largeUploadGrantId?: string,
   ): Promise<boolean>;
-  issueLargeUploadGrant(record: LargeUploadGrantRecord): Promise<void>;
   find(id: string): Promise<DiagnosticUploadRecord | null>;
   list(limit: number): Promise<DiagnosticUploadRecord[]>;
   setProviderUploadId(id: string, providerUploadId: string): Promise<boolean>;

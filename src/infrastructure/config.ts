@@ -26,7 +26,6 @@ const configSchema = z.object({
   SESSION_CSRF_HMAC_KEY_BASE64: base64Key.optional(),
   OAUTH_STATE_ENCRYPTION_KEY_BASE64: base64Key.optional(),
   UPLOAD_AUTH_HMAC_KEY_BASE64: base64Key.optional(),
-  LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64: base64Key.optional(),
   INSTALL_PSEUDONYM_HMAC_KEY_BASE64: base64Key.optional(),
   NETWORK_PSEUDONYM_HMAC_KEY_BASE64: base64Key.optional(),
   CONTROL_SIGNING_PRIVATE_KEY_BASE64: z.string().min(1).optional(),
@@ -79,7 +78,6 @@ export type ApiServiceConfig = RequiredConfiguration<
   | 'SESSION_CSRF_HMAC_KEY_BASE64'
   | 'OAUTH_STATE_ENCRYPTION_KEY_BASE64'
   | 'UPLOAD_AUTH_HMAC_KEY_BASE64'
-  | 'LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64'
   | 'INSTALL_PSEUDONYM_HMAC_KEY_BASE64'
   | 'NETWORK_PSEUDONYM_HMAC_KEY_BASE64'
   | 'INTERNAL_CONTROL_ORIGIN'
@@ -249,7 +247,6 @@ export function requireApiConfig(config: ServiceConfig): asserts config is ApiSe
     !config.SESSION_CSRF_HMAC_KEY_BASE64 ||
     !config.OAUTH_STATE_ENCRYPTION_KEY_BASE64 ||
     !config.UPLOAD_AUTH_HMAC_KEY_BASE64 ||
-    !config.LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64 ||
     !config.INSTALL_PSEUDONYM_HMAC_KEY_BASE64 ||
     !config.NETWORK_PSEUDONYM_HMAC_KEY_BASE64 ||
     !config.INTERNAL_CONTROL_ORIGIN ||

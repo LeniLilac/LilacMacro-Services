@@ -122,12 +122,12 @@
         cleanup without enabling uploads.
       </p>
 
-      <h2>Manual diagnostic uploads</h2>
+      <h2>Automatic diagnostic transfer and retention</h2>
       <p>
-        Settings includes a separate manual upload control. It remains off until enabled and always
-        requires you to choose a specific ZIP file. Access to routine archives expires after 72
-        hours. Archives over 3 GiB require a short-lived administrator grant and, if accepted, have
-        an access-expiry deadline no later than seven days. Expired objects enter the deletion
+        LilacMacro has no manual diagnostic-upload control or file picker. Automatic reports use one
+        3 GiB archive limit. The client hashes the complete archive, binds its exact size and
+        checksum, rejects redirects, and accepts storage URLs only for the trusted diagnostic
+        destination. Access expires 72 hours after verification. Expired objects enter the deletion
         queue; bounded retries can delay physical removal during an outage. Diagnostic archives
         remain in private object storage and are never served as public content.
       </p>

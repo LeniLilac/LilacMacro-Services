@@ -127,14 +127,9 @@ export class DiagnosticMaintenanceService {
   private async verifyClaimed(record: DiagnosticUploadRecord, signal?: AbortSignal): Promise<void> {
     try {
       await this.verifyObjectWithinDeadline(record, signal);
-      const decision = decideUpload(record.request, record.createdAt, true);
-      const acceptanceDeadline =
-        decision.status === 'Pending'
-          ? new Date(this.clock.now().getTime() + 30 * 60 * 1000)
-          : null;
+      const decision = decideUpload(record.request, record.createdAt);
       if (
         !(await this.repository.transition(record.id, ['VerifyingActive'], decision.status, {
-          acceptanceDeadline,
           audit: {
             actor: { kind: 'system', userId: '0' },
             action: 'verification.succeeded',

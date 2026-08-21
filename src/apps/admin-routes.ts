@@ -8,11 +8,6 @@ import {
   type AdminApiKeyScope,
 } from '../contracts/admin-api-keys.js';
 import { adminCommandEnvelopeSchema } from '../contracts/admin-commands.js';
-import {
-  absoluteLimitBytes,
-  diagnosticKindSchema,
-  routineLimitBytes,
-} from '../contracts/diagnostics.js';
 import type { Clock } from '../domain/clock.js';
 import type { DiagnosticService } from '../domain/diagnostic-service.js';
 import type { ControlRepository, TelemetryRepository } from '../domain/ports.js';
@@ -23,27 +18,13 @@ import type {
 import type { PostgresAuthStore } from '../infrastructure/auth-store.js';
 import type { ApiServiceConfig } from '../infrastructure/config.js';
 import type { WebControlClient } from '../infrastructure/internal-api-client.js';
-import type { HmacLargeUploadAuthorizer } from '../infrastructure/large-upload-authorizer.js';
-import type { RotatingPseudonymizer } from '../infrastructure/pseudonym.js';
 import { authorizeAdmin, csrfFor } from './auth-routes.js';
 
 const idSchema = z.uuid();
 const listSchema = z.object({ limit: z.coerce.number().int().min(1).max(250).default(100) });
 const moderationSchema = z
   .object({
-    action: z.enum(['accept', 'reject', 'delete']),
-    retainUntil: z.iso.datetime().optional(),
-  })
-  .strict();
-const largeUploadGrantSchema = z
-  .object({
-    installId: z.uuid(),
-    sizeBytes: z
-      .number()
-      .int()
-      .min(routineLimitBytes + 1)
-      .max(absoluteLimitBytes),
-    kind: diagnosticKindSchema,
+    action: z.literal('delete'),
   })
   .strict();
 
@@ -66,8 +47,6 @@ export interface AdminRouteDependencies {
   controlClient: WebControlClient;
   clock: Clock;
   diagnosticService: DiagnosticService;
-  pseudonymizer: RotatingPseudonymizer;
-  largeUploadAuthorizer: HmacLargeUploadAuthorizer;
   telemetryRepository: TelemetryRepository;
 }
 
@@ -126,36 +105,8 @@ function registerDiagnosticAdminRoutes(
       idSchema.parse((request.params as { id?: unknown }).id),
       { kind: 'web', userId: actor.userId },
       input.action,
-      input.retainUntil ? new Date(input.retainUntil) : undefined,
     );
     return reply.code(204).send();
-  });
-  app.post('/admin/api/diagnostics/large-upload-grants', async (request, reply) => {
-    const actor = await authorizeAdmin(request, reply, auth, true);
-    if (!actor) return;
-    const input = largeUploadGrantSchema.parse(request.body);
-    const now = dependencies.clock.now();
-    const grant = await dependencies.diagnosticService.issueLargeUploadGrant(
-      { kind: 'web', userId: actor.userId },
-      dependencies.pseudonymizer.forInstall(input.installId, now),
-      `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`,
-      input.sizeBytes,
-      input.kind,
-    );
-    return reply.code(201).send({
-      grant: dependencies.largeUploadAuthorizer.issue(
-        {
-          grantId: grant.id,
-          uploadId: grant.uploadId,
-          objectKey: grant.objectKey,
-          installPseudonym: grant.installPseudonym,
-          sizeBytes: grant.sizeBytes,
-          kind: grant.kind,
-        },
-        grant.expiresAt,
-      ),
-      expiresAt: grant.expiresAt.toISOString(),
-    });
   });
   app.post('/admin/api/diagnostics/:id/download', async (request, reply) => {
     const actor = await authorizeAdmin(request, reply, auth, true);
@@ -305,7 +256,6 @@ function serializeDiagnostics(records: Awaited<ReturnType<DiagnosticService['lis
     appVersion: record.request.appVersion,
     status: record.status,
     createdAt: record.createdAt.toISOString(),
-    acceptanceDeadline: record.acceptanceDeadline?.toISOString() ?? null,
     expiresAt: record.expiresAt.toISOString(),
   }));
 }

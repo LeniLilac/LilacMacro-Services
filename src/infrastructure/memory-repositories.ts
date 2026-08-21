@@ -13,7 +13,6 @@ import type {
   DiagnosticQuotaLimits,
   DiagnosticRepository,
   DiagnosticUploadRecord,
-  LargeUploadGrantRecord,
   SnapshotSigner,
 } from '../domain/ports.js';
 
@@ -113,7 +112,6 @@ function replayFingerprint(actor: Actor, envelope: AdminCommandEnvelope): string
 
 export class MemoryDiagnosticRepository implements DiagnosticRepository {
   private readonly records = new Map<string, DiagnosticUploadRecord>();
-  public readonly largeUploadGrants = new Map<string, LargeUploadGrantRecord>();
   public readonly audit: DiagnosticAuditRecord[] = [];
   private nextAuditId = 1;
 
@@ -122,7 +120,6 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
     since: Date,
     limits: DiagnosticQuotaLimits,
     audit: DiagnosticAuditEvent,
-    largeUploadGrantId?: string,
   ): Promise<boolean> {
     if (this.records.has(record.id)) throw new Error('Diagnostic record already exists.');
     const recent = [...this.records.values()].filter((item) => item.createdAt >= since);
@@ -160,32 +157,9 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
     ) {
       return false;
     }
-    if (largeUploadGrantId) {
-      const grant = this.largeUploadGrants.get(largeUploadGrantId);
-      if (
-        !grant ||
-        grant.consumedAt !== null ||
-        grant.expiresAt <= record.createdAt ||
-        grant.uploadId !== record.id ||
-        grant.objectKey !== record.objectKey ||
-        grant.installPseudonym !== record.installPseudonym ||
-        grant.sizeBytes !== record.request.sizeBytes ||
-        grant.kind !== record.request.kind
-      ) {
-        return false;
-      }
-      grant.consumedAt = new Date(record.createdAt);
-    }
     this.records.set(record.id, structuredClone(record));
     this.recordAudit(record.id, audit);
     return true;
-  }
-
-  public async issueLargeUploadGrant(record: LargeUploadGrantRecord): Promise<void> {
-    if (this.largeUploadGrants.has(record.id)) {
-      throw new Error('Large-upload grant already exists.');
-    }
-    this.largeUploadGrants.set(record.id, structuredClone(record));
   }
 
   public async find(id: string): Promise<DiagnosticUploadRecord | null> {

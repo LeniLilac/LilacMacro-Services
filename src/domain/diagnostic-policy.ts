@@ -1,8 +1,7 @@
 import {
-  absoluteLimitBytes,
+  maximumArchiveBytes,
   multipartPartBytes,
   oneGiB,
-  routineLimitBytes,
   type PersistedUploadRequest,
   type UploadStatus,
 } from '../contracts/diagnostics.js';
@@ -30,30 +29,13 @@ export const diagnosticQuotaLimits = {
 
 const hour = 60 * 60 * 1000;
 
-export function decideUpload(
-  request: PersistedUploadRequest,
-  now: Date,
-  largeUploadAuthorized = false,
-): UploadDecision {
-  if (request.sizeBytes > absoluteLimitBytes) throw new Error('Diagnostic archive exceeds 30 GiB.');
-  if (request.sizeBytes > routineLimitBytes && !largeUploadAuthorized) {
-    throw new Error('Archives over 3 GiB require a server-issued manual upload grant.');
-  }
-
-  const large = request.sizeBytes > routineLimitBytes;
+export function decideUpload(request: PersistedUploadRequest, now: Date): UploadDecision {
+  if (request.sizeBytes > maximumArchiveBytes) throw new Error('Diagnostic archive exceeds 3 GiB.');
   return {
-    status: large ? 'Pending' : 'Accepted',
+    status: 'Accepted',
     partSizeBytes: multipartPartBytes,
     partCount: Math.ceil(request.sizeBytes / multipartPartBytes),
-    acceptanceDeadline: large ? new Date(now.getTime() + 30 * 60 * 1000) : null,
+    acceptanceDeadline: null,
     expiresAt: new Date(now.getTime() + 72 * hour),
   };
-}
-
-export function extendRetention(now: Date, requestedUntil: Date): Date {
-  const maximum = new Date(now.getTime() + 7 * 24 * hour);
-  if (requestedUntil <= now || requestedUntil > maximum) {
-    throw new Error('Accepted diagnostics may be retained for at most seven days.');
-  }
-  return requestedUntil;
 }

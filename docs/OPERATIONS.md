@@ -76,17 +76,15 @@ The worker runs every minute and:
 1. claims completed uploads and streams each object to verify its exact byte count and SHA-256;
 2. retries transient verification failures with bounded backoff and deletes permanent mismatches;
 3. aborts multipart sessions older than 12 hours;
-4. deletes Pending large uploads after 30 minutes;
+4. deletes any legacy Pending uploads left from the retired grant workflow;
 5. deletes rejected/expired objects and tombstones metadata;
 6. lists incomplete multipart uploads under the exact service prefix and aborts provider uploads older than 12 hours that are absent from repository state;
 7. enforces the configured storage-time budget and per-install/IP quotas.
 
-For an archive over 3 GiB, the user copies the random Installation ID shown in LilacMacro Settings
-and supplies that ID plus the archive's exact byte size and kind to an administrator. The
-administrator uses **Diagnostics > Issue 30-minute grant** in the control desk, copies the returned
-grant once, and sends it back to that user. The user pastes it into LilacMacro's Large File Grant
-field before explicitly selecting the archive. The grant is attributable, tuple-bound, and consumed
-once; neither side should post it in a public channel or diagnostic record.
+All new automatic diagnostic archives use the same 3 GiB maximum. The control desk exposes review,
+download, and deletion only; it cannot issue upload grants, accept Pending archives, or extend
+retention. The legacy grant tables remain inert during the rollback-compatibility window, and the
+worker continues deleting any pre-removal Pending records.
 
 Deletion is idempotent. A failed provider deletion remains queued and is retried with bounded backoff; stale `Deleting` leases are reclaimed after 15 minutes, metadata is not reported deleted until storage confirms that every exact-key version and delete marker is absent, and Expired metadata continues to consume the global retained-byte budget until that confirmation. Provider control requests use explicit deadlines, full-object verification has a size-bounded deadline, and worker shutdown cancels active work and schedules a bounded retry before the container grace period ends. Multipart reconciliation continues through the complete claimed page even when one abort fails. The provisioned one-day Backblaze noncurrent-version and incomplete-multipart lifecycle rule is defense in depth and does not replace application reconciliation.
 

@@ -83,17 +83,6 @@ function request(sizeBytes = 1024) {
 
 const identity = { installPseudonym: 'install', networkPseudonym: 'network' };
 
-async function largeAuthorization(service: DiagnosticService, sizeBytes: number) {
-  const record = await service.issueLargeUploadGrant(
-    { kind: 'web', userId: '123' },
-    identity.installPseudonym,
-    '2026-08',
-    sizeBytes,
-    'deep-debug',
-  );
-  return { grantId: record.id, uploadId: record.uploadId, objectKey: record.objectKey };
-}
-
 async function completeOnePart(
   service: DiagnosticService,
   grant: Awaited<ReturnType<DiagnosticService['create']>>,
@@ -141,19 +130,15 @@ test('routine upload is authorized, verified, accepted, and downloadable', async
   assert.ok(repository.audit.some((event) => event.action === 'download.requested'));
 });
 
-test('manual large multipart upload becomes pending only after exact completion', async () => {
+test('the single archive limit accepts exactly 3 GiB and rejects anything larger', async () => {
   const { service, repository, storage } = fixture();
-  const size = 3 * oneGiB + 1;
+  const size = 3 * oneGiB;
   storage.expectedSize = size;
   await assert.rejects(
-    service.create(identity, request(size)),
-    /server-issued manual upload grant/,
+    service.create(identity, request(size + 1)),
+    /Too big|less than or equal to 3 GiB/,
   );
-  const grant = await service.create(
-    identity,
-    request(size),
-    await largeAuthorization(service, size),
-  );
+  const grant = await service.create(identity, request(size));
   assert.equal(grant.upload.kind, 'multipart');
   if (grant.upload.kind !== 'multipart') return;
   const last = grant.upload.partCount;
@@ -188,15 +173,7 @@ test('manual large multipart upload becomes pending only after exact completion'
   assert.equal((await repository.find(grant.id))?.status, 'Verifying');
   assert.equal(await service.verifyPending(), 1);
   const record = await repository.find(grant.id);
-  assert.equal(record?.status, 'Pending');
-  assert.equal(record?.acceptanceDeadline?.toISOString(), '2026-08-14T12:30:00.000Z');
-  await assert.rejects(
-    service.downloadUrl(grant.id, { kind: 'web', userId: '123' }),
-    /not accepted/,
-  );
-  await service.moderate(grant.id, { kind: 'discord', userId: '123' }, 'accept');
-  assert.equal((await repository.find(grant.id))?.status, 'Accepted');
-  assert.ok(repository.audit.some((event) => event.action === 'moderation.accept'));
+  assert.equal(record?.status, 'Accepted');
 });
 
 test('administrator can delete an accepted archive and repeated deletion is idempotent', async () => {
@@ -260,14 +237,7 @@ test('quota reserves atomically before requesting provider storage', async () =>
 test('multipart creation compensates when provider state cannot be persisted', async () => {
   const { service, repository, storage } = fixture();
   repository.setProviderUploadId = async () => false;
-  await assert.rejects(
-    service.create(
-      identity,
-      request(3 * oneGiB + 1),
-      await largeAuthorization(service, 3 * oneGiB + 1),
-    ),
-    /lifecycle changed/,
-  );
+  await assert.rejects(service.create(identity, request(3 * oneGiB)), /lifecycle changed/);
   assert.equal(storage.removed.length, 1);
   assert.equal(storage.removed[0]?.uploadId, 'provider-upload');
 });
@@ -276,24 +246,13 @@ test('failed multipart compensation is retained in immutable audit for reconcili
   const { service, repository, storage } = fixture();
   repository.setProviderUploadId = async () => false;
   storage.failAbortUploadIds.add('provider-upload');
-  await assert.rejects(
-    service.create(
-      identity,
-      request(3 * oneGiB + 1),
-      await largeAuthorization(service, 3 * oneGiB + 1),
-    ),
-    /lifecycle changed/,
-  );
+  await assert.rejects(service.create(identity, request(3 * oneGiB)), /lifecycle changed/);
   assert.ok(repository.audit.some((event) => event.action === 'multipart.compensation-failed'));
 });
 
 test('multipart reconciliation aborts only stale uploads absent from repository state', async () => {
   const { service, storage, now } = fixture();
-  const grant = await service.create(
-    identity,
-    request(3 * oneGiB + 1),
-    await largeAuthorization(service, 3 * oneGiB + 1),
-  );
+  const grant = await service.create(identity, request(3 * oneGiB));
   assert.equal(grant.upload.kind, 'multipart');
   storage.multipartUploads = [
     {
@@ -452,46 +411,6 @@ test('cleanup backs off failed provider deletion without reporting deletion', as
   assert.equal((await repository.find(grant.id))?.status, 'Deleted');
   assert.ok(repository.audit.some((event) => event.action === 'deletion.retry-scheduled'));
   assert.ok(repository.audit.some((event) => event.action === 'deletion.succeeded'));
-});
-
-test('moderation rejects a large upload once its atomic acceptance deadline passed', async () => {
-  const { service, repository, storage, clock } = fixture();
-  const size = 3 * oneGiB + 1;
-  storage.expectedSize = size;
-  const grant = await service.create(
-    identity,
-    request(size),
-    await largeAuthorization(service, size),
-  );
-  assert.equal(grant.upload.kind, 'multipart');
-  if (grant.upload.kind !== 'multipart') return;
-  for (let partNumber = 1; partNumber <= grant.upload.partCount; partNumber += 1) {
-    const preceding = (partNumber - 1) * multipartPartBytes;
-    await service.partUrl(
-      grant.id,
-      partNumber,
-      {
-        sizeBytes: Math.min(multipartPartBytes, size - preceding),
-        sha256: 'b'.repeat(64),
-      },
-      grant.authorizationToken,
-    );
-  }
-  await service.complete(
-    grant.id,
-    Array.from({ length: grant.upload.partCount }, (_, index) => ({
-      partNumber: index + 1,
-      etag: `"${'a'.repeat(32)}"`,
-    })),
-    grant.authorizationToken,
-  );
-  await service.verifyPending();
-  clock.advance(30 * 60 * 1000 + 1);
-  await assert.rejects(
-    service.moderate(grant.id, { kind: 'web', userId: '123' }, 'accept'),
-    /not pending/,
-  );
-  assert.equal((await repository.find(grant.id))?.status, 'Pending');
 });
 
 test('full-object mismatch is audited and deleted before acceptance', async () => {

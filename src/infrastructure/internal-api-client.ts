@@ -11,11 +11,7 @@ export interface BotControlClient {
 }
 
 export interface BotDiagnosticClient {
-  moderateDiagnostic(
-    actorId: string,
-    uploadId: string,
-    action: 'accept' | 'reject' | 'delete',
-  ): Promise<void>;
+  moderateDiagnostic(actorId: string, uploadId: string, action: 'delete'): Promise<void>;
 }
 
 export interface WebControlClient {
@@ -49,7 +45,7 @@ export class InternalApiClient implements BotControlClient, SystemControlClient 
   public async moderateDiagnostic(
     actorId: string,
     uploadId: string,
-    action: 'accept' | 'reject' | 'delete',
+    action: 'delete',
   ): Promise<void> {
     await this.request('/internal/bot/diagnostics/moderate', { actorId, uploadId, action }, 204);
   }

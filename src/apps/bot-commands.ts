@@ -86,18 +86,7 @@ export const botCommands: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [
         .setMaxValue(366 * 24 * 60 * 60),
     )
     .toJSON(),
-  command('macro-diagnostic', 'Accept, reject, or delete a diagnostic archive.')
-    .addStringOption((option) =>
-      option
-        .setName('action')
-        .setDescription('Action.')
-        .setRequired(true)
-        .addChoices(
-          { name: 'Accept', value: 'accept' },
-          { name: 'Reject', value: 'reject' },
-          { name: 'Delete', value: 'delete' },
-        ),
-    )
+  command('macro-diagnostic', 'Delete a diagnostic archive.')
     .addStringOption((option) =>
       option.setName('upload-id').setDescription('Diagnostic upload UUID.').setRequired(true),
     )
@@ -121,14 +110,12 @@ export async function handleBotInteraction(
   await interaction.deferReply({ ephemeral: true });
   try {
     if (interaction.commandName === 'macro-diagnostic') {
-      const action = interaction.options.getString('action', true) as
-        'accept' | 'reject' | 'delete';
       await dependencies.diagnostics.moderateDiagnostic(
         interaction.user.id,
         interaction.options.getString('upload-id', true),
-        action,
+        'delete',
       );
-      await interaction.editReply(`Diagnostic ${action} completed.`);
+      await interaction.editReply('Diagnostic delete completed.');
       return;
     }
     const command = commandFromInteraction(interaction);

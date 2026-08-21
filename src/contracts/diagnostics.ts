@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
 export const oneGiB = 1024 ** 3;
-export const routineLimitBytes = 3 * oneGiB;
-export const absoluteLimitBytes = 30 * oneGiB;
+export const maximumArchiveBytes = 3 * oneGiB;
 export const multipartPartBytes = 128 * 1024 ** 2;
 
 export const diagnosticKindSchema = z.enum([
@@ -11,6 +10,7 @@ export const diagnosticKindSchema = z.enum([
   'installer-log',
   'live-debug',
 ]);
+const acceptedDiagnosticKindSchema = z.enum(['deep-debug', 'runtime-log', 'live-debug']);
 
 export const createUploadRequestSchema = z
   .object({
@@ -21,9 +21,9 @@ export const createUploadRequestSchema = z
       .min(1)
       .max(160)
       .regex(/^[A-Za-z0-9][A-Za-z0-9._ -]*\.zip$/i),
-    sizeBytes: z.number().int().positive().max(absoluteLimitBytes),
+    sizeBytes: z.number().int().positive().max(maximumArchiveBytes),
     sha256: z.string().regex(/^[a-f0-9]{64}$/i),
-    kind: diagnosticKindSchema,
+    kind: acceptedDiagnosticKindSchema,
     explicitConsent: z.literal(true),
     appVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
   })
@@ -31,7 +31,9 @@ export const createUploadRequestSchema = z
 
 export type CreateUploadRequest = z.infer<typeof createUploadRequestSchema>;
 
-export const persistedUploadRequestSchema = createUploadRequestSchema.omit({ installId: true });
+export const persistedUploadRequestSchema = createUploadRequestSchema
+  .omit({ installId: true })
+  .extend({ kind: diagnosticKindSchema });
 
 export type PersistedUploadRequest = z.infer<typeof persistedUploadRequestSchema>;
 

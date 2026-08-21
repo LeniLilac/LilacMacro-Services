@@ -35,7 +35,6 @@ const composeEnvironment = {
   SESSION_CSRF_HMAC_KEY_BASE64: encodedKey,
   OAUTH_STATE_ENCRYPTION_KEY_BASE64: encodedKey,
   UPLOAD_AUTH_HMAC_KEY_BASE64: encodedKey,
-  LARGE_UPLOAD_GRANT_HMAC_KEY_BASE64: encodedKey,
   INSTALL_PSEUDONYM_HMAC_KEY_BASE64: encodedKey,
   NETWORK_PSEUDONYM_HMAC_KEY_BASE64: encodedKey,
   CLOUDFLARE_TUNNEL_TOKEN: 'container-check-not-connected',

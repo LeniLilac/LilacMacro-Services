@@ -11,7 +11,7 @@ import {
   PostgresDiagnosticRepository,
   createPool,
 } from '../src/infrastructure/postgres-repositories.js';
-import type { DiagnosticUploadRecord, LargeUploadGrantRecord } from '../src/domain/ports.js';
+import type { DiagnosticUploadRecord } from '../src/domain/ports.js';
 import { startTemporaryPostgres, type TemporaryPostgres } from './helpers/postgres.js';
 
 let database: TemporaryPostgres | undefined;
@@ -215,84 +215,6 @@ test('Postgres diagnostic repository enforces quotas, bound parts, audit, and re
     ),
     false,
     'Expired metadata must reserve storage until provider deletion succeeds.',
-  );
-});
-
-test('large-upload grant issuance is immutable, attributable, and consumed once', async () => {
-  const repository = new PostgresDiagnosticRepository(pool);
-  const now = new Date('2026-08-14T14:00:00.000Z');
-  const upload = diagnosticRecord(now);
-  upload.request = { ...upload.request, sizeBytes: 4_000_000_000, kind: 'live-debug' };
-  const grant: LargeUploadGrantRecord = {
-    id: randomUUID(),
-    uploadId: upload.id,
-    objectKey: upload.objectKey,
-    installPseudonym: upload.installPseudonym,
-    keyEpoch: '2026-08',
-    sizeBytes: upload.request.sizeBytes,
-    kind: upload.request.kind,
-    issuer: { kind: 'web', userId: '123' },
-    expiresAt: new Date(now.getTime() + 30 * 60_000),
-    consumedAt: null,
-    createdAt: now,
-  };
-  await repository.issueLargeUploadGrant(grant);
-  const issued = await pool.query(
-    'SELECT * FROM diagnostic_large_upload_grant_audit WHERE grant_id = $1',
-    [grant.id],
-  );
-  assert.equal(issued.rows[0]?.actor_id, '123');
-  assert.equal(issued.rows[0]?.action, 'grant.issued');
-  assert.doesNotMatch(JSON.stringify(issued.rows), /aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/);
-  const limits = {
-    installDailyBytes: 10_000_000_000,
-    networkDailyBytes: 10_000_000_000,
-    installDailyUploads: 10,
-    networkDailyUploads: 10,
-    installActiveUploads: 10,
-    networkActiveUploads: 10,
-    globalDailyBytes: 10_000_000_000,
-    globalDailyUploads: 10,
-    globalActiveUploads: 10,
-    globalRetainedBytes: 10_000_000_000,
-  };
-  const audit = {
-    actor: { kind: 'system' as const, userId: '0' },
-    action: 'upload.created' as const,
-    details: { manualGrant: true },
-    createdAt: now,
-  };
-  assert.equal(
-    await repository.insertWithinQuota(
-      upload,
-      new Date(now.getTime() - 86_400_000),
-      limits,
-      audit,
-      grant.id,
-    ),
-    true,
-  );
-  assert.equal(
-    await repository.insertWithinQuota(
-      upload,
-      new Date(now.getTime() - 86_400_000),
-      limits,
-      audit,
-      grant.id,
-    ),
-    false,
-  );
-  assert.equal(
-    (
-      await pool.query(
-        "SELECT count(*)::int AS count FROM diagnostic_large_upload_grant_audit WHERE grant_id = $1 AND action = 'grant.consumed'",
-        [grant.id],
-      )
-    ).rows[0]?.count,
-    1,
-  );
-  await assert.rejects(
-    pool.query('DELETE FROM diagnostic_large_upload_grant_audit WHERE grant_id = $1', [grant.id]),
   );
 });
 

@@ -5,7 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
-import { createUploadRequestSchema, routineLimitBytes } from '../contracts/diagnostics.js';
+import { createUploadRequestSchema } from '../contracts/diagnostics.js';
 import type { Clock } from '../domain/clock.js';
 import { checksumHeaderValue, type DiagnosticService } from '../domain/diagnostic-service.js';
 import type {
@@ -17,7 +17,6 @@ import type { PostgresAdminApiKeyStore } from '../infrastructure/admin-api-key-s
 import type { PostgresAuthStore } from '../infrastructure/auth-store.js';
 import type { ApiServiceConfig } from '../infrastructure/config.js';
 import type { RotatingPseudonymizer } from '../infrastructure/pseudonym.js';
-import type { HmacLargeUploadAuthorizer } from '../infrastructure/large-upload-authorizer.js';
 import type { WebControlClient } from '../infrastructure/internal-api-client.js';
 import { parseVerifyAndValidateSnapshot } from '../infrastructure/snapshot-signer.js';
 import { TrustedProxyAddressResolver } from '../infrastructure/trusted-proxy.js';
@@ -43,9 +42,6 @@ const partGrantSchema = z
   })
   .strict();
 const idSchema = z.uuid();
-const largeUploadRequestSchema = createUploadRequestSchema.extend({
-  largeUploadGrant: z.string().min(20).max(2_048).optional(),
-});
 
 export interface ApiDependencies {
   config: ApiServiceConfig;
@@ -56,7 +52,6 @@ export interface ApiDependencies {
   clock: Clock;
   diagnosticService: DiagnosticService;
   pseudonymizer: RotatingPseudonymizer;
-  largeUploadAuthorizer: HmacLargeUploadAuthorizer;
   telemetryRepository: TelemetryRepository;
   configurationShares: ConfigurationShareRepository;
   configurationSharingEnabled: boolean;
@@ -217,20 +212,10 @@ function registerDiagnosticRoutes(
     '/v1/diagnostics/uploads',
     { config: { rateLimit: { max: 8, timeWindow: '1 hour' } } },
     async (request, reply) => {
-      const input = largeUploadRequestSchema.parse(request.body);
-      const { largeUploadGrant, installId, ...uploadRequest } = input;
+      const input = createUploadRequestSchema.parse(request.body);
+      const { installId, ...uploadRequest } = input;
       const now = dependencies.clock.now();
       const installPseudonym = dependencies.pseudonymizer.forInstall(installId, now);
-      const largeUploadAuthorization =
-        input.sizeBytes <= routineLimitBytes || largeUploadGrant === undefined
-          ? null
-          : dependencies.largeUploadAuthorizer.verify(
-              largeUploadGrant,
-              installPseudonym,
-              input.sizeBytes,
-              input.kind,
-              now,
-            );
       const grant = await dependencies.diagnosticService.create(
         {
           installPseudonym,
@@ -243,7 +228,6 @@ function registerDiagnosticRoutes(
           ),
         },
         uploadRequest,
-        largeUploadAuthorization,
       );
       return reply.code(201).send(grant);
     },

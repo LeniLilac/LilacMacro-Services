@@ -514,14 +514,6 @@ select {
   grid-template-columns: 1fr 1fr 220px auto;
   align-items: end;
 }
-.large-upload-form {
-  grid-template-columns: 1.1fr 1fr 180px auto;
-  align-items: end;
-  margin-bottom: 20px;
-  padding: 18px;
-  background: var(--paper-2);
-  border: 1px solid #bbaab3;
-}
 .api-key-form {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(420px, 1.5fr) 180px auto;
@@ -770,7 +762,6 @@ dialog::backdrop {
   }
   .stack-form,
   .schedule-form,
-  .large-upload-form,
   .api-key-form {
     grid-template-columns: 1fr;
   }
