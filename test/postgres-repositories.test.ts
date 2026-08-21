@@ -226,7 +226,7 @@ test('Postgres diagnostic repository enforces quotas, bound parts, audit, and re
     globalDailyBytes: 1_000_000,
     globalDailyUploads: 1_000,
     globalActiveUploads: 1_000,
-    globalRetainedBytes: 1_500,
+    globalRetainedBytes: 2_000,
   };
   assert.equal(
     await repository.insertWithinQuota(
@@ -235,8 +235,41 @@ test('Postgres diagnostic repository enforces quotas, bound parts, audit, and re
       retainedOnlyLimits,
       createdAudit,
     ),
+    true,
+    'The oldest archive from the fullest installation should be queued for capacity deletion.',
+  );
+  assert.deepEqual(
+    (
+      await pool.query('SELECT status, capacity_released FROM diagnostic_uploads WHERE id = $1', [
+        record.id,
+      ])
+    ).rows[0],
+    { status: 'Expired', capacity_released: true },
+  );
+  assert.equal(
+    (await repository.listAudit(record.id, 10)).some(
+      (event) => event.action === 'retention.evicted',
+    ),
+    true,
+  );
+  assert.equal((await repository.claimExpired(now, 1))[0]?.id, record.id);
+  assert.equal(
+    await repository.scheduleDeletionRetry(record.id, new Date(now.getTime() + 60_000), {
+      actor: { kind: 'system', userId: '0' },
+      action: 'deletion.retry-scheduled',
+      details: { attempt: 1 },
+      createdAt: now,
+    }),
+    true,
+  );
+  assert.equal(
+    (
+      await pool.query('SELECT capacity_released FROM diagnostic_uploads WHERE id = $1', [
+        record.id,
+      ])
+    ).rows[0]?.capacity_released,
     false,
-    'Expired metadata must reserve storage until provider deletion succeeds.',
+    'A provider deletion failure must restore the archive to retained-capacity accounting.',
   );
 });
 

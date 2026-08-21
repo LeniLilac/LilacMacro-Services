@@ -76,13 +76,19 @@ test('legal pages publish direct contact and the implemented privacy controls', 
     assert.match(page, /mailto:lilithlilac000@gmail\.com/);
     assert.doesNotMatch(page, /private contact channel|contact@vanguardvalues\.gg/);
   }
-  assert.match(privacy, /Online features and\s+product telemetry are initially shown on/);
-  assert.match(privacy, /Telemetry becomes eligible for scheduled deletion after 90 days/);
-  assert.match(privacy, /expire 72 hours after upload/);
-  assert.match(privacy, /stored without a full server-side read/);
-  assert.match(privacy, /no manual diagnostic-upload control or file picker/);
-  assert.doesNotMatch(privacy, /administrator grant|30 GiB/);
-  assert.match(privacy, /separate local cleanup setting can keep\s+only the 20 newest/);
+  assert.match(privacy, /<h1>Privacy Policy<\/h1>/);
+  assert.match(privacy, /All\s+three are initially shown on/);
+  assert.match(privacy, /eligible for\s+scheduled\s+deletion\s+after\s+90 days/);
+  assert.match(privacy, /no later than 72 hours after upload/);
+  assert.match(privacy, /not fully read by the service unless an\s+administrator requests/);
+  assert.match(privacy, /no manual diagnostic-upload feature/);
+  assert.match(privacy, /shared 1,000 GB allocation/);
+  assert.doesNotMatch(
+    privacy,
+    /Privacy without guesswork|light report|administrator grant|30 GiB|20 newest/i,
+  );
   assert.match(terms, /PolyForm Noncommercial\s+License 1\.0\.0/);
   assert.match(terms, /href="\/privacy">Privacy Policy<\/a>/);
+  assert.match(terms, /<h2>Public beta<\/h2>/);
+  assert.match(terms, /Configuration shares and submitted content/);
 });

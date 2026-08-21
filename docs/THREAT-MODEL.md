@@ -22,23 +22,23 @@ Configuration shares are untrusted opaque data. The API accepts only a bounded b
 
 ## Principal threats and controls
 
-| Threat                          | Required controls                                                                                                                              |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Forged macro policy             | Ed25519 canonical signatures, pinned public key, schema/expiry/revision validation, LKG                                                        |
-| Compromised admin session       | PKCE/state, exact redirects, hashed short sessions, exact ID allowlist, CSRF checks, audit log                                                 |
-| Discord interaction forgery     | Gateway library validation, exact application identity, per-command admin authorization                                                        |
-| Remote-code channel creep       | Closed control schemas; deny arbitrary strings as identifiers; no coordinates/scripts/binaries                                                 |
-| Upload cost abuse               | Explicit consent, declared-size cap, quotas, trusted-edge client identity, rotating HMAC pseudonyms                                            |
-| Credential exposure             | Doppler injection, redaction, no secret response bodies, no signed URL logging, private bucket                                                 |
-| Path/object traversal           | server-generated UUID object keys, prefix checks, no caller-selected filesystem/object path                                                    |
-| Multipart confusion             | scoped token; exact part size/checksum grants; assembled-size check; on-demand streamed full-object size and SHA-256 before download           |
-| Archive bombs/malware           | never auto-extract; quarantine metadata; admin download only; content disposition attachment                                                   |
-| Stolen administrator API key    | 256-bit random secret, hash-only storage, closed read scopes, short expiry, revocation, rate limits, no mutation or archive-download authority |
-| Share guessing or storage abuse | Random bearer codes, strict alphabet/size bounds, per-network and global count/byte quotas, no-store, 30-day expiry, bounded deletion          |
-| Snapshot rollback/replay        | monotonic revision, generated/expiry bounds, transactionally signed published revision                                                         |
-| SSRF/open redirect              | fixed vendor origins, exact redirect allowlist, no arbitrary fetch URL, bounded redirects                                                      |
-| Supply-chain compromise         | lockfile, pinned Actions commits, audit gate, minimal production image, non-root runtime                                                       |
-| Deployment tamper               | verified main SHA, immutable staging, lock, health gate, rollback, unprivileged deploy user                                                    |
+| Threat                          | Required controls                                                                                                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Forged macro policy             | Ed25519 canonical signatures, pinned public key, schema/expiry/revision validation, LKG                                                                                                           |
+| Compromised admin session       | PKCE/state, exact redirects, hashed short sessions, exact ID allowlist, CSRF checks, audit log                                                                                                    |
+| Discord interaction forgery     | Gateway library validation, exact application identity, per-command admin authorization                                                                                                           |
+| Remote-code channel creep       | Closed control schemas; deny arbitrary strings as identifiers; no coordinates/scripts/binaries                                                                                                    |
+| Upload cost abuse               | Explicit consent, declared-size cap, quotas, trusted-edge client identity, rotating HMAC pseudonyms, a 1,000 GB retained allocation, and fair oldest-first eviction from the fullest installation |
+| Credential exposure             | Doppler injection, redaction, no secret response bodies, no signed URL logging, private bucket                                                                                                    |
+| Path/object traversal           | server-generated UUID object keys, prefix checks, no caller-selected filesystem/object path                                                                                                       |
+| Multipart confusion             | scoped token; exact part size/checksum grants; assembled-size check; on-demand streamed full-object size and SHA-256 before download                                                              |
+| Archive bombs/malware           | never auto-extract; quarantine metadata; admin download only; content disposition attachment                                                                                                      |
+| Stolen administrator API key    | 256-bit random secret, hash-only storage, closed read scopes, short expiry, revocation, rate limits, no mutation or archive-download authority                                                    |
+| Share guessing or storage abuse | Random bearer codes, strict alphabet/size bounds, per-network and global count/byte quotas, no-store, 30-day expiry, bounded deletion                                                             |
+| Snapshot rollback/replay        | monotonic revision, generated/expiry bounds, transactionally signed published revision                                                                                                            |
+| SSRF/open redirect              | fixed vendor origins, exact redirect allowlist, no arbitrary fetch URL, bounded redirects                                                                                                         |
+| Supply-chain compromise         | lockfile, pinned Actions commits, audit gate, minimal production image, non-root runtime                                                                                                          |
+| Deployment tamper               | verified main SHA, immutable staging, lock, health gate, rollback, unprivileged deploy user                                                                                                       |
 
 ## Privacy identifiers
 

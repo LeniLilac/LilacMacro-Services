@@ -355,8 +355,17 @@ footer span {
   margin-top: 36px;
   font-size: 28px;
 }
+.document h3 {
+  margin: 28px 0 10px;
+  font-size: 19px;
+}
 .document p {
   line-height: 1.7;
+  color: var(--muted);
+}
+.document li {
+  margin: 8px 0;
+  line-height: 1.6;
   color: var(--muted);
 }
 .admin-body {
@@ -824,6 +833,21 @@ dialog::backdrop {
   }
 }
 @media (max-width: 620px) {
+  .document {
+    margin: 24px 14px;
+    padding: 28px 22px;
+    box-shadow: 5px 5px 0 var(--ink);
+  }
+
+  .document h1 {
+    margin: 14px 0 28px;
+    font-size: clamp(40px, 13vw, 56px);
+  }
+
+  .document h2 {
+    font-size: 25px;
+  }
+
   .public-body .masthead {
     gap: 12px;
   }

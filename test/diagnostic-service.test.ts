@@ -102,10 +102,10 @@ async function completeOnePart(
 }
 
 test('global retained storage cap stays below the accepted monthly TB-hour budget', () => {
-  assert.equal(diagnosticQuotaLimits.globalRetainedBytes, 900 * oneGiB);
+  assert.equal(diagnosticQuotaLimits.globalRetainedBytes, 1_000_000_000_000);
   const decimalTerabyteHoursPerThirtyDays =
     (diagnosticQuotaLimits.globalRetainedBytes / 1_000_000_000_000) * 30 * 24;
-  assert.ok(decimalTerabyteHoursPerThirtyDays < 730);
+  assert.equal(decimalTerabyteHoursPerThirtyDays, 720);
 });
 
 test('routine upload is stored until download requests verification', async () => {

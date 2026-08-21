@@ -4,6 +4,7 @@ import type { AdminCommandEnvelope } from '../contracts/admin-commands.js';
 import type { SignedControlSnapshot } from '../contracts/control-snapshot.js';
 import type { MultipartPartGrant, UploadStatus } from '../contracts/diagnostics.js';
 import { applyAdminCommand, type MutableControlState } from '../domain/control-state.js';
+import { selectCapacityEvictions } from '../domain/diagnostic-capacity.js';
 import type {
   Actor,
   ControlAuditRecord,
@@ -112,6 +113,7 @@ function replayFingerprint(actor: Actor, envelope: AdminCommandEnvelope): string
 
 export class MemoryDiagnosticRepository implements DiagnosticRepository {
   private readonly records = new Map<string, DiagnosticUploadRecord>();
+  private readonly capacityReleased = new Set<string>();
   public readonly audit: DiagnosticAuditRecord[] = [];
   private nextAuditId = 1;
 
@@ -139,7 +141,9 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
       (item) => item.networkPseudonym === record.networkPseudonym,
     );
     const retained = [...this.records.values()].filter(
-      (item) => !['Deleted', 'Rejected', 'Invalid'].includes(item.status),
+      (item) =>
+        !['Deleted', 'Rejected', 'Invalid'].includes(item.status) &&
+        !this.capacityReleased.has(item.id),
     );
     if (
       install.length >= limits.installDailyUploads ||
@@ -153,11 +157,36 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
       network.reduce((sum, item) => sum + item.request.sizeBytes, 0) + record.request.sizeBytes >
         limits.networkDailyBytes ||
       recent.reduce((sum, item) => sum + item.request.sizeBytes, 0) + record.request.sizeBytes >
-        limits.globalDailyBytes ||
-      retained.reduce((sum, item) => sum + item.request.sizeBytes, 0) + record.request.sizeBytes >
-        limits.globalRetainedBytes
+        limits.globalDailyBytes
     ) {
       return false;
+    }
+    const evictionIds = selectCapacityEvictions(
+      retained.map((item) => ({
+        id: item.id,
+        installPseudonym: item.installPseudonym,
+        sizeBytes: item.request.sizeBytes,
+        createdAt: item.createdAt,
+        evictable: ['Pending', 'Accepted', 'Failed', 'Expired'].includes(item.status),
+      })),
+      record.request.sizeBytes,
+      limits.globalRetainedBytes,
+    );
+    if (evictionIds === null) return false;
+    for (const id of evictionIds) {
+      const victim = this.records.get(id)!;
+      victim.status = 'Expired';
+      victim.updatedAt = new Date(record.createdAt);
+      this.capacityReleased.add(id);
+      this.recordAudit(id, {
+        actor: { kind: 'system', userId: '0' },
+        action: 'retention.evicted',
+        details: {
+          reason: 'global-storage-capacity',
+          incomingSizeBytes: record.request.sizeBytes,
+        },
+        createdAt: record.createdAt,
+      });
     }
     this.records.set(record.id, structuredClone(record));
     this.recordAudit(record.id, audit);
@@ -262,6 +291,7 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
     record.deletionAttempts += 1;
     record.nextDeletionAttemptAt = new Date(nextAttemptAt);
     record.updatedAt = new Date();
+    this.capacityReleased.delete(id);
     this.recordAudit(id, audit);
     return true;
   }
@@ -326,6 +356,12 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
             record.status === 'Expired' ||
             (record.status === 'Failed' &&
               (record.nextDeletionAttemptAt === null || record.nextDeletionAttemptAt <= now))),
+      )
+      .sort(
+        (left, right) =>
+          Number(this.capacityReleased.has(right.id)) -
+            Number(this.capacityReleased.has(left.id)) ||
+          left.expiresAt.getTime() - right.expiresAt.getTime(),
       )
       .slice(0, limit);
     for (const record of claimed) {

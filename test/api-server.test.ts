@@ -207,10 +207,12 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.match(downloadsCss.body, /grid-template-columns: minmax\(0, 1fr\)/);
     const privacy = await app.inject({ method: 'GET', url: '/privacy' });
     assert.equal(privacy.statusCode, 200);
+    assert.match(privacy.body, /<h1>Privacy Policy<\/h1>/);
     assert.match(privacy.body, /PRODUCT TELEMETRY/i);
-    assert.match(privacy.body, /at most 32/);
-    assert.match(privacy.body, /80 MiB/);
+    assert.match(privacy.body, /3 GiB/);
+    assert.match(privacy.body, /1,000 GB/);
     assert.match(privacy.body, /90\s+days/);
+    assert.doesNotMatch(privacy.body, /light report|80 MiB/i);
     const terms = await app.inject({ method: 'GET', url: '/terms' });
     assert.equal(terms.statusCode, 200);
     assert.match(terms.body, /Terms of Service/);

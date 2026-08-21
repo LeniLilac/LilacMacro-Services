@@ -72,6 +72,7 @@ export interface DiagnosticAuditEvent {
     | 'moderation.reject'
     | 'moderation.delete'
     | 'download.requested'
+    | 'retention.evicted'
     | 'deletion.claimed'
     | 'deletion.succeeded'
     | 'deletion.retry-scheduled'

@@ -13,6 +13,7 @@ import type {
   DiagnosticRepository,
   DiagnosticUploadRecord,
 } from '../domain/ports.js';
+import { selectCapacityEvictions } from '../domain/diagnostic-capacity.js';
 import { insertDiagnosticAudit, mapDiagnostic } from './postgres-diagnostic-mappers.js';
 
 export class PostgresDiagnosticRepository implements DiagnosticRepository {
@@ -43,7 +44,6 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
         global_count: string;
         global_active: string;
         global_bytes: string;
-        global_retained_bytes: string;
       }>(
         `SELECT
           count(*) FILTER (WHERE install_pseudonym = $1) AS install_count,
@@ -59,11 +59,7 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
           count(*) AS global_count,
           count(*) FILTER (WHERE status IN ('Uploading','Completing','Verifying','VerifyingActive','Deleting') OR
             (status = 'Pending' AND acceptance_deadline IS NOT NULL)) AS global_active,
-          COALESCE(sum((request->>'sizeBytes')::bigint), 0) AS global_bytes,
-          (SELECT COALESCE(sum((request->>'sizeBytes')::bigint), 0)
-             FROM diagnostic_uploads retained
-            WHERE retained.status NOT IN ('Deleted','Rejected','Invalid'))
-            AS global_retained_bytes
+          COALESCE(sum((request->>'sizeBytes')::bigint), 0) AS global_bytes
          FROM diagnostic_uploads WHERE created_at >= $3`,
         [record.installPseudonym, record.networkPseudonym, since],
       );
@@ -77,11 +73,66 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
         Number(row.global_active) >= limits.globalActiveUploads ||
         Number(row.install_bytes) + record.request.sizeBytes > limits.installDailyBytes ||
         Number(row.network_bytes) + record.request.sizeBytes > limits.networkDailyBytes ||
-        Number(row.global_bytes) + record.request.sizeBytes > limits.globalDailyBytes ||
-        Number(row.global_retained_bytes) + record.request.sizeBytes > limits.globalRetainedBytes
+        Number(row.global_bytes) + record.request.sizeBytes > limits.globalDailyBytes
       ) {
         await client.query('ROLLBACK');
         return false;
+      }
+
+      const retained = await client.query<{
+        id: string;
+        install_pseudonym: string;
+        size_bytes: string;
+        created_at: Date;
+        status: UploadStatus;
+      }>(
+        `SELECT id, install_pseudonym, (request->>'sizeBytes')::bigint AS size_bytes,
+                created_at, status
+           FROM diagnostic_uploads
+          WHERE status NOT IN ('Deleted','Rejected','Invalid')
+            AND NOT capacity_released
+          ORDER BY created_at, id
+          FOR UPDATE`,
+      );
+      const evictionIds = selectCapacityEvictions(
+        retained.rows.map((item) => ({
+          id: item.id,
+          installPseudonym: item.install_pseudonym,
+          sizeBytes: Number(item.size_bytes),
+          createdAt: new Date(item.created_at),
+          evictable: ['Pending', 'Accepted', 'Failed', 'Expired'].includes(item.status),
+        })),
+        record.request.sizeBytes,
+        limits.globalRetainedBytes,
+      );
+      if (evictionIds === null) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      if (evictionIds.length > 0) {
+        const evicted = await client.query<{ id: string }>(
+          `UPDATE diagnostic_uploads
+              SET status = 'Expired', capacity_released = true, updated_at = $2
+            WHERE id = ANY($1::uuid[])
+              AND status IN ('Pending','Accepted','Failed','Expired')
+              AND NOT capacity_released
+          RETURNING id`,
+          [evictionIds, record.createdAt],
+        );
+        if (evicted.rowCount !== evictionIds.length) {
+          throw new Error('Diagnostic capacity eviction conflicted with another lifecycle owner.');
+        }
+        for (const victim of evicted.rows) {
+          await insertDiagnosticAudit(client, victim.id, {
+            actor: { kind: 'system', userId: '0' },
+            action: 'retention.evicted',
+            details: {
+              reason: 'global-storage-capacity',
+              incomingSizeBytes: record.request.sizeBytes,
+            },
+            createdAt: record.createdAt,
+          });
+        }
       }
       await client.query(
         `INSERT INTO diagnostic_uploads
@@ -239,7 +290,7 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
       const result = await client.query(
         `UPDATE diagnostic_uploads
          SET status = 'Failed', deletion_attempts = deletion_attempts + 1,
-             next_deletion_attempt_at = $2, updated_at = now()
+             next_deletion_attempt_at = $2, capacity_released = false, updated_at = now()
          WHERE id = $1 AND status = 'Deleting'`,
         [id, nextAttemptAt],
       );
@@ -318,7 +369,7 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
                   OR status = 'Expired'
                   OR (status = 'Failed' AND
                       (next_deletion_attempt_at IS NULL OR next_deletion_attempt_at <= $1)))
-           ORDER BY expires_at ASC
+           ORDER BY capacity_released DESC, expires_at ASC
            FOR UPDATE SKIP LOCKED LIMIT $2
          )
          UPDATE diagnostic_uploads AS uploads

@@ -15,188 +15,255 @@
       <a class="brand" href="/"><span class="brand-mark">L</span>LilacMacro</a>
     </header>
     <main class="document">
-      <div class="eyebrow">PRIVACY / UPDATED AUGUST 16, 2026</div>
-      <h1>Privacy without guesswork.</h1>
+      <div class="eyebrow">PRIVACY POLICY / UPDATED AUGUST 21, 2026</div>
+      <h1>Privacy Policy</h1>
       <p>
-        This Privacy Policy explains how LilacMacro ("we," "us," or "our") handles information when
-        you use the LilacMacro Windows app, website, control service, and related support tools (the
-        "Services"). LilacMacro performs its automation locally. Optional online features are
-        separated so you can decide what leaves your device.
+        This Privacy Policy explains how the independent LilacMacro community project ("LilacMacro,"
+        "we," "us," or "our") handles information through the LilacMacro Windows app, website,
+        hosted services, and support tools (the "Services"). The app performs automation locally.
+        This Policy describes what remains on your device, what optional features send, why we use
+        that information, and the choices available to you.
       </p>
       <p>
-        <strong>Effective date:</strong> August 15, 2026. <strong>Last updated:</strong> August 16,
+        <strong>Effective date:</strong> August 15, 2026. <strong>Last updated:</strong> August 21,
         2026.
+      </p>
+
+      <h2>Summary</h2>
+      <ul>
+        <li>Core automation, Plans, settings, and visual profiles operate locally.</li>
+        <li>
+          Online features, product telemetry, and Deep Debug error uploads are separate choices. All
+          three are initially shown on, but none begins until you save the first-run screen.
+        </li>
+        <li>
+          We do not sell personal information, show targeted advertising, or use public-site
+          analytics or tracking cookies.
+        </li>
+        <li>
+          Diagnostic archives are private, limited to 3 GiB each, and available to us for no more
+          than 72 hours. They may be deleted sooner when the shared 1,000 GB allocation is full.
+        </li>
+      </ul>
+
+      <h2>Scope and contact</h2>
+      <p>
+        This Policy applies to information handled by the Services. It does not govern Roblox, Anime
+        Expeditions, Discord, GitHub, Cloudflare, or other third-party services, which have their
+        own policies. LilacMacro is operated through the LeniLilac GitHub organization. For privacy
+        questions or requests, email
+        <a href="mailto:lilithlilac000@gmail.com">lilithlilac000@gmail.com</a>.
       </p>
 
       <h2>Your privacy choices</h2>
       <p>
-        The app presents three separate choices before the first macro session. Online features and
-        product telemetry are initially shown on; automatic error reports are initially off. No data
-        covered by those choices is sent until you save the screen. You can change each choice later
-        in Settings.
+        Before the first macro session, the app presents three separate choices. All are initially
+        shown on. No covered request or upload begins until you select Save &amp; Continue. You can
+        change each choice later in Settings. Turning a choice off stops new activity for that
+        feature; a bounded network request already in flight may finish.
       </p>
       <ul>
         <li>
-          <strong>Online features.</strong> Controls requests for signed service status, public game
-          codes, maintenance notices, safety disables, official update metadata, and available
-          explicit service-backed Plan and placement sharing.
+          <strong>Online services and updates.</strong> Requests signed service status, public game
+          codes, maintenance notices, safety disables, official update metadata, and configuration
+          sharing that you explicitly request.
         </li>
         <li>
-          <strong>Product telemetry.</strong> Controls bounded events used to understand
-          reliability, feature use, expedition reward observations, and OCR performance.
+          <strong>Usage data.</strong> Sends fixed-format events about feature use, reliability,
+          expedition rewards, OCR timing, and coarse device capability.
         </li>
         <li>
-          <strong>Automatic error reports.</strong> Controls automatic creation and upload of a
-          limited light report or an existing Deep Debug archive after an error.
+          <strong>Deep Debug error uploads.</strong> After a classified macro error, sends the
+          completed Deep Debug archive. Uploading pauses while Deep Debug logging is off or low disk
+          space temporarily disables it.
         </li>
       </ul>
 
-      <h2>Online features</h2>
+      <h2>Information we process</h2>
+      <h3>Website and service requests</h3>
       <p>
-        When online features are enabled, LilacMacro may request signed operational status, public
-        game codes, known-bug or maintenance disables, official GitHub release metadata, and
-        service-backed configuration sharing when requested. An export sends only the selected Plan
-        and/or map placement documents as one compressed opaque bundle. It excludes private-server
-        links, Discord settings, privacy choices, run history, diagnostics, and other app settings.
-        The service returns a random 20-character bearer code and stores only its SHA-256 hash.
-        Retrieval access automatically ends 30 days after creation, even if physical cleanup is
-        temporarily delayed. Expired records are queued for bounded background deletion; a service
-        outage or retry can delay physical removal. Anyone with the code can retrieve the bundle
-        before expiry, so share codes should be kept private. Retrieval uses a fixed no-store JSON
-        endpoint so the code does not enter the request URL. A monthly rotating, sharing-specific
-        network pseudonym is used only for daily abuse limits; raw source addresses are not stored
-        with the bundle. Turning this choice off prevents new LilacMacro service and update-check
-        requests. One bounded request already in flight may finish and update its local public
-        cache. Local automation remains available, but it will not receive current maintenance or
-        safety status.
+        Cloudflare and our hosting provider process network information, including source IP
+        addresses, to deliver and protect requests. The application temporarily uses a normalized
+        source address for rate limits and keyed pseudonyms, but does not store the raw address in
+        its database or application logs. Application logs contain bounded operational details such
+        as request method, fixed route, response status, and timing. They omit request headers,
+        bearer codes, and source addresses.
       </p>
 
-      <h2>Product telemetry</h2>
+      <h3>Online services and configuration sharing</h3>
       <p>
-        When telemetry is enabled, the app sends only fields from a fixed schema: app version;
-        feature and outcome identifiers; expedition material and quantity observations; error-state
-        counters without free-form exception text; OCR duration and CPU or GPU execution category;
-        Windows version; logical processor count; and process capability.
-      </p>
-      <p>
-        Telemetry does not include screenshots, OCR text, file paths, Roblox credentials,
-        private-server links, Discord webhook URLs, raw hardware identifiers, or raw IP addresses.
-        We do not sell personal information or use telemetry for targeted advertising.
-      </p>
-      <p>
-        The app creates a random installation UUID locally. The service immediately converts that
-        UUID and the normalized source network into separate, monthly rotating HMAC pseudonyms. It
-        stores neither the raw UUID nor the raw IP address. The network pseudonym is used only for a
-        daily abuse quota. Stored telemetry and diagnostic pseudonyms use separate HMAC domains and
-        are not directly joinable in the database.
-      </p>
-      <p>
-        We use telemetry to estimate active installations, understand feature use and error-prone
-        states, improve OCR performance, and inform manually reviewed expedition reward research.
-        Aggregates never automatically change macro behavior, reward distributions, or remote
-        control policy. Telemetry becomes eligible for scheduled deletion after 90 days. Cleanup
-        runs in bounded batches and retries after transient failures, so an outage can delay
-        physical removal.
+        Online services may retrieve signed operational status, public game codes, safety notices,
+        and official GitHub release metadata. If you export a configuration, the app sends only the
+        Plan and/or map placement documents you selected as one compressed bundle. It excludes
+        private-server links, Discord settings, privacy choices, run history, diagnostics, and
+        unrelated app settings. We store the opaque bundle, its checksum, timestamps, and a monthly
+        rotating network pseudonym used only for abuse limits. We store only a hash of the random
+        20-character share code. Anyone with the code can retrieve the bundle before it expires, so
+        keep it private.
       </p>
 
-      <h2>Automatic error reports</h2>
+      <h3>Usage data</h3>
       <p>
-        Automatic reports are a separate opt-in and are off initially. With Deep Debug off, an error
-        may create a temporary light report containing a sanitized event timeline, non-secret
-        display and plan counts, coarse device information, model and profile identifiers, macro
-        actions, and at most 32 important frames that the app already captured. The archive has an
-        80 MiB hard limit.
+        Analytics uses a closed schema containing app version; feature and outcome identifiers;
+        expedition material and quantity observations; bounded error-state counters without
+        free-form exception text; OCR duration and CPU or GPU execution category; Windows version;
+        logical processor count; and process capability. It does not contain screenshots, OCR text,
+        file paths, Roblox credentials, private-server links, Discord webhook URLs, raw hardware
+        identifiers, or raw IP addresses.
       </p>
       <p>
-        Light reports exclude OCR text, free-form exception text, file paths, private-server links,
-        Discord data, and credentials. Frames can still contain personal information visible inside
-        Roblox, so review what may be on screen before enabling automatic reports.
-      </p>
-      <p>
-        With Deep Debug active, the completed Deep Debug archive is sent instead. Temporary light
-        files are removed after the upload attempt. A successfully sent Deep Debug archive is
-        removed; a failed Deep Debug upload remains local so you can inspect or retry it. When
-        automatic reports are off, the app does not create a light report and does not send or
-        delete a Deep Debug archive because of reporting. A separate local cleanup setting can keep
-        only the 20 newest Deep Debug archives whether reporting is on or off; you can disable that
-        cleanup without enabling uploads.
+        The app creates a random installation UUID. The service immediately transforms that UUID and
+        the normalized source network into separate monthly rotating HMAC pseudonyms and stores
+        neither source value. Analytics and diagnostics use separate HMAC domains, so their stored
+        pseudonyms are not directly joinable in the database. We use aggregates to estimate active
+        installations, find error-prone states, understand feature use, improve OCR, and support
+        manually reviewed reward research. Aggregates never automatically change macro behavior,
+        reward distributions, or remote safety policy.
       </p>
 
-      <h2>Automatic diagnostic transfer and retention</h2>
+      <h3>Deep Debug error uploads</h3>
       <p>
-        LilacMacro has no manual diagnostic-upload control or file picker. Automatic reports use one
-        3 GiB archive limit. The client hashes the complete archive, binds its exact size and
-        checksum, rejects redirects, and accepts storage URLs only for the trusted diagnostic
-        destination. Completed archives remain private and stored without a full server-side read
-        until an administrator asks to download one. That request verifies the complete size and
-        checksum before download; invalid archives are deleted. Requested and unrequested archives
-        expire 72 hours after upload and enter the deletion queue; bounded retries can delay
-        physical removal during an outage. Diagnostic archives are never served as public content.
+        LilacMacro has no manual diagnostic-upload feature and does not create a smaller fallback
+        report. When both Deep Debug logging and automatic error uploads are enabled, a classified
+        error can send the completed Deep Debug archive. An archive can contain the run's structured
+        timeline, macro actions, sanitized logs and configuration context, and selected Roblox
+        frames from important transitions and approximately 10 seconds before and after classified
+        errors. Frames can contain information visible inside Roblox. Archives exclude credentials,
+        webhook URLs, private-server links, and raw file paths through client-side redaction, but no
+        redaction system is perfect.
+      </p>
+      <p>
+        Each archive is limited to 3 GiB. The client binds the exact archive size and SHA-256 digest
+        to the upload. The archive remains private and is not fully read by the service unless an
+        administrator requests a download. A requested archive is verified against its bound size
+        and digest before download; invalid archives are deleted. A successfully sent archive is
+        removed from the local shared Deep Debug folder. A failed upload remains local for review.
       </p>
 
-      <h2>Information kept on your device</h2>
+      <h3>Administrator authentication and records</h3>
       <p>
-        Settings, plans, visual profiles, local logs, and Deep Debug archives stay on your Windows
-        device unless a feature described above sends them. Uninstalling LilacMacro does not
-        silently erase user-created datasets or retained diagnostics. You can remove local data with
-        ordinary Windows file management.
+        The private administrator console is protected by Cloudflare Access and Discord OAuth. Those
+        services process the authorized email address and Discord account information needed to
+        authenticate the administrator. LilacMacro requests Discord's identity scope and stores the
+        authorized Discord user ID, short-lived OAuth state, session records, CSRF protection data,
+        and immutable administrative audit entries. The public Services do not offer user accounts.
       </p>
 
-      <h2>Service records and providers</h2>
+      <h2>How and why we use information</h2>
+      <p>We use information only for the following purposes:</p>
+      <ul>
+        <li>provide a feature or transfer that you request;</li>
+        <li>operate, maintain, troubleshoot, and improve the Services;</li>
+        <li>measure reliability and performance through the choices you save;</li>
+        <li>
+          enforce rate limits, prevent abuse, secure accounts, and preserve audit evidence; and
+        </li>
+        <li>
+          comply with law and protect the rights, safety, and integrity of users or the project.
+        </li>
+      </ul>
       <p>
-        The service keeps limited operational records such as object keys, checksums, app versions,
-        audit entries, and rotating abuse-prevention pseudonyms. It does not store raw IP addresses.
-        We may share only the information needed to operate the Services with infrastructure and
-        authentication providers, including Hetzner, Cloudflare, PostgreSQL hosting, Backblaze B2,
-        GitHub, and Discord. Those providers process information under their own terms and privacy
-        policies. We may also disclose information when required by law or reasonably necessary to
-        protect users, the project, or the public.
+        Where a legal basis is required, we rely on your consent for optional analytics and Deep
+        Debug uploads, performance of a requested service or our Terms for features you ask us to
+        provide, legitimate interests in security and reliable operation, and legal obligations
+        where applicable. You can withdraw an optional choice in Settings without affecting earlier
+        lawful processing.
       </p>
 
-      <h2>Retention and security</h2>
+      <h2>Service providers and disclosures</h2>
       <p>
-        We retain information only as long as needed for the purposes described here, applicable
-        legal obligations, security, and dispute resolution. The specific telemetry and diagnostic
-        limits above control where they are shorter. We use measures such as HTTPS, access controls,
-        pseudonymization, private object storage, bounded schemas, and limited credentials. No
-        transmission or storage method is completely secure.
+        We disclose only the information needed to operate the Services to Cloudflare for content
+        delivery, abuse protection, and administrator access; Hetzner for application and database
+        hosting; Backblaze B2 for private diagnostic storage; GitHub for source code and official
+        releases; and Discord for administrator authentication and user-configured webhooks. These
+        providers process information under their own terms and policies. We may also disclose
+        information when required by law or reasonably necessary to protect users, the project, or
+        the public. We do not sell personal information or disclose it for targeted advertising.
       </p>
 
-      <h2>Your rights and requests</h2>
+      <h2>Retention</h2>
+      <ul>
+        <li>
+          <strong>Configuration shares:</strong> retrieval expires no later than 30 days after
+          creation, followed by bounded deletion retries.
+        </li>
+        <li>
+          <strong>Usage data:</strong> rows and their capacity records become eligible for scheduled
+          deletion after 90 days.
+        </li>
+        <li>
+          <strong>Deep Debug archives:</strong> access expires no later than 72 hours after upload.
+          Archives can be deleted sooner to keep total retained allocation within 1,000 GB. When
+          space is needed, the service selects the oldest archive from the installation with the
+          most retained archives, recalculates counts, and repeats until the new archive fits. Count
+          ties use the oldest archive globally.
+        </li>
+        <li>
+          <strong>Administrator authentication:</strong> OAuth attempts expire after 5 minutes and
+          application sessions after 8 hours. Security and audit records are kept as needed to
+          protect and account for administrative actions.
+        </li>
+      </ul>
       <p>
-        Depending on where you live, you may have rights to access, correct, delete, restrict, or
-        object to certain processing of personal information. You may also withdraw an optional app
-        choice at any time in Settings. Because telemetry identifiers rotate and the service does
-        not retain the raw installation UUID, we may be unable to identify a telemetry record as
-        yours. Email us to make a privacy request; we may ask for reasonable verification before
-        acting on it.
+        Expiration ends normal access and queues deletion. A provider outage or failed deletion may
+        delay physical removal; the service retries and restores failed diagnostic deletions to
+        capacity accounting. Local settings, Plans, visual profiles, and Deep Debug archives remain
+        on your device until you delete them or a described local retention or successful-upload
+        rule removes them. Uninstalling the app does not silently erase user-created data.
+      </p>
+
+      <h2>Cookies and similar technologies</h2>
+      <p>
+        The public website does not use advertising, analytics, or tracking cookies. The private
+        administrator console uses secure, necessary cookies for OAuth browser binding and the
+        administrator session. Cloudflare may use necessary security and access cookies under its
+        own policy.
+      </p>
+
+      <h2>Security</h2>
+      <p>
+        We use HTTPS, access controls, purpose-separated credentials and pseudonyms, private object
+        storage, bounded schemas, checksums, rate limits, and audit logging. No security measure can
+        guarantee absolute protection, and you should avoid placing secrets or unrelated personal
+        information on screen while Deep Debug logging is active.
+      </p>
+
+      <h2>Your rights and choices</h2>
+      <p>
+        Depending on where you live, you may have rights to know about, access, correct, delete,
+        restrict, object to, or obtain a portable copy of personal information, and to appeal or
+        complain to a data-protection regulator. You may withdraw optional app choices in Settings.
+        We do not use personal information for automated decisions that produce legal or similarly
+        significant effects. Because identifiers rotate and raw source identifiers are not stored,
+        we may be unable to link an analytics record to you. We may request reasonable verification
+        before completing a request and may retain information where law permits or requires it.
       </p>
 
       <h2>Children's privacy</h2>
       <p>
         The hosted Services are not directed to children under 13, and we do not knowingly collect
-        personal information from a child under 13. If you believe a child provided personal
-        information through the Services, contact us so we can investigate and delete it where
-        appropriate.
+        personal information from a child under 13. If you believe a child submitted personal
+        information, contact us so we can investigate and delete it where appropriate.
       </p>
 
       <h2>International processing</h2>
       <p>
-        Information may be processed in the United States and in other countries where our service
-        providers operate. Those countries may have data-protection rules different from the rules
-        where you live.
+        Information may be processed in the United States, Germany, and other countries where our
+        providers operate. Their laws may differ from those where you live. Where required, service
+        providers use legal safeguards for international transfers.
       </p>
 
-      <h2>Changes to this policy</h2>
+      <h2>Changes to this Policy</h2>
       <p>
-        We may update this Policy as the Services change. We will update the date above and, for a
-        material change to an in-app data choice, present a new notice version before the affected
-        feature resumes sending data.
+        We may update this Policy as the Services change. We will revise the date above. If a
+        material change affects an in-app privacy choice, the app will present a new notice version
+        before that feature resumes sending data. We will not use previously collected information
+        for a materially different purpose without notice and any consent required by law.
       </p>
 
       <h2>Contact</h2>
       <p>
-        Questions or privacy requests? Email
+        Questions, requests, or complaints can be sent to
         <a href="mailto:lilithlilac000@gmail.com">lilithlilac000@gmail.com</a>.
       </p>
     </main>

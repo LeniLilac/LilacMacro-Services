@@ -24,7 +24,7 @@ export const diagnosticQuotaLimits = {
   globalDailyBytes: 500 * oneGiB,
   globalDailyUploads: 1_000,
   globalActiveUploads: 32,
-  globalRetainedBytes: 900 * oneGiB,
+  globalRetainedBytes: 1_000_000_000_000,
 } as const;
 
 const hour = 60 * 60 * 1000;
