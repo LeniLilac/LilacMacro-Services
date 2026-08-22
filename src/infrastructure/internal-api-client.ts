@@ -16,6 +16,7 @@ export interface BotDiagnosticClient {
 
 export interface WebControlClient {
   executeWeb(actorId: string, envelope: AdminCommandEnvelope): Promise<number>;
+  executeApiKey(keyId: string, envelope: AdminCommandEnvelope): Promise<number>;
 }
 
 export class InternalApiClient implements BotControlClient, SystemControlClient {
@@ -40,6 +41,13 @@ export class InternalApiClient implements BotControlClient, SystemControlClient 
 
   public async executeWeb(actorId: string, envelope: AdminCommandEnvelope): Promise<number> {
     return this.revision('/internal/api/commands', { actorId, envelope });
+  }
+
+  public async executeApiKey(keyId: string, envelope: AdminCommandEnvelope): Promise<number> {
+    return this.revision('/internal/api/commands', {
+      actor: { kind: 'api-key', userId: keyId },
+      envelope,
+    });
   }
 
   public async moderateDiagnostic(

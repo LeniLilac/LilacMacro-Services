@@ -180,27 +180,61 @@ function registerAdminDataRoutes(app: FastifyInstance, dependencies: AdminRouteD
   app.get('/v1/admin-data', { config: apiKeyRateLimit }, async (request, reply) => {
     const key = await authorizeApiKey(request, reply, dependencies, null);
     if (!key) return;
-    const resourceByScope: Record<AdminApiKeyScope, string> = {
-      'control:read': '/v1/admin-data/control',
-      'diagnostics:read': '/v1/admin-data/diagnostics',
-      'telemetry:read': '/v1/admin-data/telemetry',
-      'audit:read': '/v1/admin-data/audit',
-    };
     return {
       key: { name: key.name, prefix: key.prefix, expiresAt: key.expiresAt.toISOString() },
-      resources: key.scopes.map((scope) => ({ scope, href: resourceByScope[scope] })),
+      resources: key.scopes.flatMap((scope) => adminResourcesByScope[scope]),
     };
   });
   app.get('/v1/admin-data/control', { config: apiKeyRateLimit }, async (request, reply) => {
     if (!(await authorizeApiKey(request, reply, dependencies, 'control:read'))) return;
     return dependencies.controlRepository.readState();
   });
+  app.post(
+    '/v1/admin-data/control/commands',
+    { config: apiKeyMutationRateLimit },
+    async (request, reply) => {
+      const key = await authorizeApiKey(request, reply, dependencies, 'control:write');
+      if (!key) return;
+      const revision = await dependencies.controlClient.executeApiKey(
+        key.id,
+        adminCommandEnvelopeSchema.parse(request.body),
+      );
+      return reply.code(201).send({ revision });
+    },
+  );
   app.get('/v1/admin-data/diagnostics', { config: apiKeyRateLimit }, async (request, reply) => {
     if (!(await authorizeApiKey(request, reply, dependencies, 'diagnostics:read'))) return;
     return serializeDiagnostics(
       await dependencies.diagnosticService.list(adminDataQuerySchema.parse(request.query).limit),
     );
   });
+  app.post(
+    '/v1/admin-data/diagnostics/:id/download',
+    { config: apiKeyMutationRateLimit },
+    async (request, reply) => {
+      const key = await authorizeApiKey(request, reply, dependencies, 'diagnostics:download');
+      if (!key) return;
+      const result = await dependencies.diagnosticService.requestDownload(
+        idSchema.parse((request.params as { id?: unknown }).id),
+        apiKeyActor(key),
+      );
+      return reply.code(result.status === 'Accepted' ? 200 : 202).send(result);
+    },
+  );
+  app.delete(
+    '/v1/admin-data/diagnostics/:id',
+    { config: apiKeyMutationRateLimit },
+    async (request, reply) => {
+      const key = await authorizeApiKey(request, reply, dependencies, 'diagnostics:delete');
+      if (!key) return;
+      await dependencies.diagnosticService.moderate(
+        idSchema.parse((request.params as { id?: unknown }).id),
+        apiKeyActor(key),
+        'delete',
+      );
+      return reply.code(204).send();
+    },
+  );
   app.get('/v1/admin-data/telemetry', { config: apiKeyRateLimit }, async (request, reply) => {
     if (!(await authorizeApiKey(request, reply, dependencies, 'telemetry:read'))) return;
     const days = adminDataQuerySchema.parse(request.query).days;
@@ -214,9 +248,90 @@ function registerAdminDataRoutes(app: FastifyInstance, dependencies: AdminRouteD
     if (!(await authorizeApiKey(request, reply, dependencies, 'audit:read'))) return;
     return readAudit(dependencies, adminDataQuerySchema.parse(request.query).limit);
   });
+  app.get('/v1/admin-data/keys', { config: apiKeyRateLimit }, async (request, reply) => {
+    if (!(await authorizeApiKey(request, reply, dependencies, 'keys:manage'))) return;
+    return serializeKeys(await dependencies.apiKeyStore.list());
+  });
+  app.post('/v1/admin-data/keys', { config: apiKeyCredentialRateLimit }, async (request, reply) => {
+    const key = await authorizeApiKey(request, reply, dependencies, 'keys:manage');
+    if (!key) return;
+    const input = createAdminApiKeySchema.parse(request.body);
+    if (input.scopes.some((scope) => !key.scopes.includes(scope))) {
+      return reply
+        .code(403)
+        .send({ error: 'A child key cannot receive a scope the current key does not have.' });
+    }
+    const now = dependencies.clock.now();
+    const requestedExpiry = now.getTime() + input.expiresInDays * 24 * 60 * 60 * 1_000;
+    const created = await dependencies.apiKeyStore.create(
+      apiKeyActorId(key),
+      input.name,
+      input.scopes,
+      new Date(Math.min(requestedExpiry, key.expiresAt.getTime())),
+      now,
+    );
+    return reply.code(201).send({ ...serializeKey(created), token: created.token });
+  });
+  app.post(
+    '/v1/admin-data/keys/:id/revoke',
+    { config: apiKeyCredentialRateLimit },
+    async (request, reply) => {
+      const key = await authorizeApiKey(request, reply, dependencies, 'keys:manage');
+      if (!key) return;
+      const revoked = await dependencies.apiKeyStore.revoke(
+        idSchema.parse((request.params as { id?: unknown }).id),
+        apiKeyActorId(key),
+        dependencies.clock.now(),
+      );
+      return revoked
+        ? reply.code(204).send()
+        : reply.code(404).send({ error: 'API key not found.' });
+    },
+  );
 }
 
 const apiKeyRateLimit = { rateLimit: { max: 60, timeWindow: '1 minute' } };
+const apiKeyMutationRateLimit = { rateLimit: { max: 30, timeWindow: '1 minute' } };
+const apiKeyCredentialRateLimit = { rateLimit: { max: 10, timeWindow: '1 hour' } };
+
+type AdminResource = { scope: AdminApiKeyScope; href: string; method?: 'POST' | 'DELETE' };
+
+const adminResourcesByScope: Record<AdminApiKeyScope, readonly AdminResource[]> = {
+  'control:read': [{ scope: 'control:read', href: '/v1/admin-data/control' }],
+  'control:write': [
+    {
+      scope: 'control:write',
+      href: '/v1/admin-data/control/commands',
+      method: 'POST',
+    },
+  ],
+  'diagnostics:read': [{ scope: 'diagnostics:read', href: '/v1/admin-data/diagnostics' }],
+  'diagnostics:download': [
+    {
+      scope: 'diagnostics:download',
+      href: '/v1/admin-data/diagnostics/{id}/download',
+      method: 'POST',
+    },
+  ],
+  'diagnostics:delete': [
+    {
+      scope: 'diagnostics:delete',
+      href: '/v1/admin-data/diagnostics/{id}',
+      method: 'DELETE',
+    },
+  ],
+  'telemetry:read': [{ scope: 'telemetry:read', href: '/v1/admin-data/telemetry' }],
+  'audit:read': [{ scope: 'audit:read', href: '/v1/admin-data/audit' }],
+  'keys:manage': [
+    { scope: 'keys:manage', href: '/v1/admin-data/keys' },
+    { scope: 'keys:manage', href: '/v1/admin-data/keys', method: 'POST' },
+    {
+      scope: 'keys:manage',
+      href: '/v1/admin-data/keys/{id}/revoke',
+      method: 'POST',
+    },
+  ],
+};
 
 async function authorizeApiKey(
   request: FastifyRequest,
@@ -237,6 +352,14 @@ async function authorizeApiKey(
     return null;
   }
   return key;
+}
+
+function apiKeyActor(key: AdminApiKeyRecord) {
+  return { kind: 'api-key' as const, userId: key.id };
+}
+
+function apiKeyActorId(key: AdminApiKeyRecord): string {
+  return `api-key:${key.id}`;
 }
 
 async function readAudit(dependencies: AdminRouteDependencies, limit: number) {

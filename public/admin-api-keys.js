@@ -34,12 +34,22 @@ async function revokeApiKey(key) {
 }
 
 const apiKeyForm = document.querySelector('#api-key-form');
+const allApiScopes = document.querySelector('#all-api-scopes');
+const apiScopeInputs = [...document.querySelectorAll('input[name="scopes"]')];
+allApiScopes.onchange = () => {
+  for (const input of apiScopeInputs) input.checked = allApiScopes.checked;
+};
+for (const input of apiScopeInputs) {
+  input.onchange = () => {
+    allApiScopes.checked = apiScopeInputs.every((scope) => scope.checked);
+  };
+}
 apiKeyForm.onsubmit = async (event) => {
   event.preventDefault();
   const submittedForm = event.currentTarget;
   const form = new FormData(submittedForm);
   const scopes = form.getAll('scopes');
-  if (!scopes.length) return notice('Select at least one read scope.', true);
+  if (!scopes.length) return notice('Select at least one API capability.', true);
   try {
     const result = await request('/admin/api/keys', {
       method: 'POST',
@@ -52,6 +62,7 @@ apiKeyForm.onsubmit = async (event) => {
     document.querySelector('#api-key-token').value = result.token;
     document.querySelector('#api-key-result').hidden = false;
     submittedForm.reset();
+    allApiScopes.checked = false;
     await loadApiKeys();
     notice('API key created. Copy it now; only its hash is stored.');
   } catch (error) {

@@ -91,6 +91,27 @@ test('private control boundary enforces service tokens, actors, and closed comma
       ).statusCode,
       201,
     );
+    const apiKeyId = randomUUID();
+    assert.equal(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/internal/api/commands',
+          headers: bearer(apiToken),
+          payload: {
+            actor: { kind: 'api-key', userId: apiKeyId },
+            envelope: {
+              commandId: randomUUID(),
+              expectedRevision: 1,
+              command: { type: 'code.add', code: 'KEYCONTROL', expiresAt: null },
+            },
+          },
+        })
+      ).statusCode,
+      201,
+    );
+    assert.equal((await repository.listAudit(10))[0]?.actor.kind, 'api-key');
+    assert.equal((await repository.listAudit(10))[0]?.actor.userId, apiKeyId);
     assert.equal(
       (
         await app.inject({
@@ -189,6 +210,18 @@ test('internal client binds bearer token, path, response schema, and bounded fai
   assert.equal(calls[0]?.url, 'http://control:3101/internal/bot/commands');
   assert.equal(calls[0]?.authorization, 'Bearer secret-token');
   assert.equal((calls[0]?.body as { actorId: string }).actorId, '123');
+  const apiKeyId = randomUUID();
+  const envelope = {
+    commandId: randomUUID(),
+    expectedRevision: 7,
+    command: { type: 'code.add' as const, code: 'FROMKEY', expiresAt: null },
+  };
+  assert.equal(await client.executeApiKey(apiKeyId, envelope), 7);
+  assert.equal(calls[1]?.url, 'http://control:3101/internal/api/commands');
+  assert.deepEqual((calls[1]?.body as { actor: unknown }).actor, {
+    kind: 'api-key',
+    userId: apiKeyId,
+  });
 
   const diagnosticCalls: Array<{ url: string; body: unknown }> = [];
   const diagnosticClient = new InternalApiClient(

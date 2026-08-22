@@ -29,7 +29,7 @@ The existing VPS host and unprivileged deploy identity are recorded only in `.lo
 - Only the fixed `cloudflared` edge-network address is trusted. Direct loopback requests and user-supplied `X-Forwarded-For` or `CF-Connecting-IP` values cannot select a rate-limit or diagnostic pseudonym.
 - Public assets cache for one hour and may be served stale for one day during an origin error. Public HTML caches for five minutes. Signed control snapshots cache for 30 seconds with a five-minute stale-on-error window.
 - OAuth, administration, telemetry ingestion, diagnostics, internal APIs, and health endpoints always return `no-store`.
-- Read-only administrator data endpoints under `/v1/admin-data` also return `no-store`, require a scoped bearer key, and remain outside the Cloudflare Access-protected `/admin*` browser path so automation can authenticate directly.
+- Scoped administrator endpoints under `/v1/admin-data` return `no-store`, require a bearer key for each exact capability, and remain outside the Cloudflare Access-protected `/admin*` browser path so automation can authenticate directly.
 
 Telemetry is retained for at most 90 days. The worker deletes up to 10,000 expired rows during each maintenance loop, which bounds each transaction while exceeding the 100,000-event global daily admission budget over a day of normal worker operation. Admission also caps serialized request bytes at 64 MiB globally per UTC day and uses telemetry-specific rotating network pseudonyms to cap each network at 2,048 events and 4 MiB per day. Verify the cleanup log remains clear and query the authenticated 30-day aggregate view from the control desk; the **Last event** column should advance for an active opted-in release. The public API role can insert bounded rows and call the bounded aggregate function, but cannot read or delete raw telemetry. Never export installation or network pseudonyms or join them to diagnostic metadata. Telemetry uses HMAC domains separate from diagnostics and rotates monthly, so active-installation counts spanning a month boundary are estimates rather than stable-user counts. Public telemetry has no genuine-client proof and must be treated as forgeable and deniable: review sample size, anomalies, and statistical evidence manually, and never automatically feed telemetry into bundled reward distributions or signed control policy.
 
@@ -37,18 +37,24 @@ Configuration-share payloads are retained for at most 30 days and are deleted in
 
 Diagnostic archives expire no later than 72 hours after upload and share one 1,000 GB retained allocation. Before granting an upload, the repository serializes global admission. If the archive will not fit, it queues the oldest evictable archive from the installation with the highest retained archive count, recalculates counts after each selection, and repeats only until enough logical capacity is available. A count tie selects the oldest archive globally. Capacity-evicted archives are claimed before routine expiry work. Provider deletion can briefly lag the logical release; if deletion fails, the archive is restored to retained-capacity accounting and follows the bounded retry schedule. Monitor `retention.evicted`, `deletion.succeeded`, and `deletion.retry-scheduled` audit events together. Repeated retries can therefore cause new uploads to fail closed rather than let retained allocation silently exceed 1,000 GB.
 
-### Read-only API keys
+### Admin API keys
 
 Create keys only from **Control Desk → API keys**. Select the minimum required scopes and shortest practical lifetime. The full token is shown once; store it in a local secret manager or Doppler, never source control, logs, screenshots, chat, or diagnostic archives. The API stores only its hash and cannot recover it.
 
 Start at `GET /v1/admin-data` with `Authorization: Bearer <key>`. The returned catalog contains only the resources granted to that key:
 
 - `control:read` → `/v1/admin-data/control`
-- `diagnostics:read` → `/v1/admin-data/diagnostics?limit=100` (metadata only; no hash, contents, or download authority)
+- `control:write` → `POST /v1/admin-data/control/commands` (administrator-owned closed command envelopes only)
+- `diagnostics:read` → `/v1/admin-data/diagnostics?limit=100` (metadata only)
+- `diagnostics:download` → `POST /v1/admin-data/diagnostics/{id}/download` (queues on-demand verification; poll until the response contains the short-lived URL)
+- `diagnostics:delete` → `DELETE /v1/admin-data/diagnostics/{id}`
 - `telemetry:read` → `/v1/admin-data/telemetry?days=30` (bounded aggregates only)
 - `audit:read` → `/v1/admin-data/audit?limit=100`
+- `keys:manage` → `GET/POST /v1/admin-data/keys` and `POST /v1/admin-data/keys/{id}/revoke`
 
-Revoke an unused, copied, or suspected-exposed key immediately from the same page. Creation and revocation appear in the immutable audit page; last-use time and count are operational hints, not proof that a key was never copied. API keys never authorize writes, diagnostic downloads, or further credential creation.
+Select **All admin capabilities** only for an owner-controlled automation secret. Such a key can change live control state, verify/download or delete user diagnostics, and create replacement credentials. It still cannot run system-owned commands, read raw telemetry, or access infrastructure credentials. Keys created programmatically cannot receive a scope or expiry beyond their parent key. Control and diagnostic mutations identify the exact key UUID in their immutable audit records; key creation and revocation identify the invoking browser administrator or parent key.
+
+Revoke an unused, copied, or suspected-exposed key immediately. The full token is never recoverable. Last-use time and count are operational hints, not proof that a key was never copied.
 
 - Keep Cloudflare Always Online disabled for the API origin because it overrides documented stale behavior.
 

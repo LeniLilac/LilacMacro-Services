@@ -9,7 +9,7 @@ import type { MutableControlState } from './control-state.js';
 import type { TelemetryEvent, TelemetryKind } from '../contracts/telemetry.js';
 
 export interface Actor {
-  kind: 'discord' | 'web' | 'system';
+  kind: 'discord' | 'web' | 'api-key' | 'system';
   userId: string;
 }
 

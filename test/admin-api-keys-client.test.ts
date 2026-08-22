@@ -9,4 +9,7 @@ test('API key submission retains its form across asynchronous work', async () =>
   assert.match(source, /const form = new FormData\(submittedForm\);/);
   assert.match(source, /submittedForm\.reset\(\);/);
   assert.doesNotMatch(source, /event\.currentTarget\.reset\(\);/);
+  assert.match(source, /allApiScopes\.onchange/);
+  assert.match(source, /apiScopeInputs\.every\(\(scope\) => scope\.checked\)/);
+  assert.match(source, /Select at least one API capability\./);
 });

@@ -20,6 +20,16 @@ import { Ed25519SnapshotSigner } from '../src/infrastructure/snapshot-signer.js'
 import { hashSessionToken, issueCsrfToken } from '../src/infrastructure/session-codec.js';
 import { HmacUploadAuthorizer } from '../src/infrastructure/upload-authorizer.js';
 import { startTemporaryPostgres } from './helpers/postgres.js';
+import {
+  assertBrowserAudit,
+  assertFullAccessAudit,
+  assertFullAccessDiagnosticMetadata,
+  assertFullAccessTelemetry,
+  createFullAccessKey,
+  deleteFullAccessDiagnostic,
+  executeFullAccessControlCommand,
+  requestFullAccessDiagnosticDownload,
+} from './support/admin-api-key-capabilities.js';
 
 class ApiStorage implements UploadStorage {
   public expectedBytes = 0;
@@ -123,6 +133,10 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     controlClient: {
       async executeWeb(actorId, envelope) {
         const snapshot = await commandService.execute({ kind: 'web', userId: actorId }, envelope);
+        return snapshot.payload.revision;
+      },
+      async executeApiKey(keyId, envelope) {
+        const snapshot = await commandService.execute({ kind: 'api-key', userId: keyId }, envelope);
         return snapshot.payload.revision;
       },
     },
@@ -400,7 +414,8 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       headers: { cookie },
     });
     assert.equal(apiKeysPage.statusCode, 200);
-    assert.match(apiKeysPage.body, /Read-only API keys/);
+    assert.match(apiKeysPage.body, /Admin API keys/);
+    assert.match(apiKeysPage.body, /diagnostics:download/);
     assert.equal((await app.inject({ method: 'GET', url: '/v1/admin-data' })).statusCode, 401);
     assert.equal(
       (
@@ -442,6 +457,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       ).statusCode,
       401,
     );
+    const fullApiToken = await createFullAccessKey(app, cookie, csrf);
     assert.equal(
       (
         await app.inject({
@@ -472,7 +488,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       headers: { cookie },
     });
     assert.equal(listedKeys.statusCode, 200);
-    assert.equal(listedKeys.json()[0].name, 'Test reader');
+    assert.ok(listedKeys.json().some((key: { name: string }) => key.name === 'Test reader'));
     assert.equal('token' in listedKeys.json()[0], false);
     assert.equal('secretHash' in listedKeys.json()[0], false);
     assert.equal(
@@ -504,6 +520,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(telemetrySummary.json().rows[0].kind, 'ocr-timing');
     assert.equal(telemetrySummary.json().rows[0].estimatedInstallations, 1);
     assert.equal(telemetrySummary.json().rows[0].latestEventAt, '2026-08-14T11:59:30.000Z');
+    await assertFullAccessTelemetry(app, fullApiToken);
     const command = {
       commandId: randomUUID(),
       expectedRevision: 0,
@@ -528,6 +545,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     });
     assert.equal(commandResponse.statusCode, 201);
     assert.equal(commandResponse.json().revision, 1);
+    await executeFullAccessControlCommand(app, fullApiToken, 1);
     assert.equal((await app.inject({ method: 'GET', url: '/health/ready' })).statusCode, 200);
     const control = await app.inject({ method: 'GET', url: '/v1/control' });
     assert.equal(control.statusCode, 200);
@@ -580,6 +598,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(diagnostics.statusCode, 200);
     assert.equal(diagnostics.json()[0].status, 'Stored');
     assert.equal(diagnostics.json()[0].verificationActive, false);
+    await assertFullAccessDiagnosticMetadata(app, fullApiToken, grant.id);
     const downloadPath = `/admin/api/diagnostics/${grant.id}/download`;
     assert.equal(
       (
@@ -601,6 +620,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       ).statusCode,
       403,
     );
+    await requestFullAccessDiagnosticDownload(app, fullApiToken, grant.id, 202);
     const verification = await app.inject({
       method: 'POST',
       url: downloadPath,
@@ -617,6 +637,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(download.statusCode, 200);
     assert.equal(download.json().status, 'Accepted');
     assert.equal(download.json().url, 'https://download.invalid/archive');
+    await requestFullAccessDiagnosticDownload(app, fullApiToken, grant.id, 200);
     assert.equal(
       (
         await app.inject({
@@ -628,17 +649,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       ).statusCode,
       403,
     );
-    assert.equal(
-      (
-        await app.inject({
-          method: 'POST',
-          url: `/admin/api/diagnostics/${grant.id}/moderate`,
-          headers: { cookie, 'x-csrf-token': csrf },
-          payload: { action: 'delete' },
-        })
-      ).statusCode,
-      204,
-    );
+    await deleteFullAccessDiagnostic(app, fullApiToken, grant.id, { cookie, csrf });
     assert.equal((await diagnosticService.list())[0]?.status, 'Expired');
     await diagnosticService.cleanup();
     assert.equal((await diagnosticService.list())[0]?.status, 'Deleted');
@@ -704,23 +715,8 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
       2,
     );
 
-    const audit = await app.inject({
-      method: 'GET',
-      url: '/admin/api/audit',
-      headers: { cookie },
-    });
-    assert.equal(audit.statusCode, 200);
-    assert.equal(audit.json().control[0].command.type, 'code.add');
-    assert.ok(
-      audit
-        .json()
-        .diagnostics.some((event: { action: string }) => event.action === 'moderation.delete'),
-    );
-    assert.ok(
-      audit
-        .json()
-        .diagnostics.some((event: { action: string }) => event.action === 'download.requested'),
-    );
+    await assertBrowserAudit(app, cookie);
+    await assertFullAccessAudit(app, fullApiToken);
 
     const largeInstallId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
     const largeSize = 3 * 1024 ** 3 + 1;

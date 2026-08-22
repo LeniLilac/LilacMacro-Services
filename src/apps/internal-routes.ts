@@ -11,12 +11,20 @@ import type { DiagnosticService } from '../domain/diagnostic-service.js';
 import type { Actor, ControlRepository } from '../domain/ports.js';
 import type { ApiServiceConfig, ControlServiceConfig } from '../infrastructure/config.js';
 
-const apiCommandSchema = z
-  .object({
-    actorId: z.string().regex(/^\d+$/),
-    envelope: adminCommandEnvelopeSchema,
-  })
-  .strict();
+const apiCommandSchema = z.union([
+  z
+    .object({
+      actorId: z.string().regex(/^\d+$/),
+      envelope: adminCommandEnvelopeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      actor: z.object({ kind: z.literal('api-key'), userId: z.uuid() }).strict(),
+      envelope: adminCommandEnvelopeSchema,
+    })
+    .strict(),
+]);
 
 const botCommandSchema = z
   .object({
@@ -65,13 +73,11 @@ export function registerControlInternalRoutes(
   app.post('/internal/api/commands', async (request, reply) => {
     requireBearer(request, dependencies.config.INTERNAL_API_TOKEN_BASE64);
     const input = apiCommandSchema.parse(request.body);
-    if (!dependencies.config.adminIds.has(input.actorId)) {
+    if ('actorId' in input && !dependencies.config.adminIds.has(input.actorId)) {
       return reply.code(403).send({ error: 'Administrator access required.' });
     }
-    const snapshot = await dependencies.commandService.execute(
-      { kind: 'web', userId: input.actorId },
-      input.envelope,
-    );
+    const actor: Actor = 'actorId' in input ? { kind: 'web', userId: input.actorId } : input.actor;
+    const snapshot = await dependencies.commandService.execute(actor, input.envelope);
     return reply.code(201).send({ revision: snapshot.payload.revision });
   });
 

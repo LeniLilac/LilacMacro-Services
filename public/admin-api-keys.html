@@ -23,10 +23,10 @@
       <section class="admin-heading">
         <div>
           <div class="eyebrow">PROGRAMMATIC ACCESS</div>
-          <h1>Read-only API keys</h1>
+          <h1>Admin API keys</h1>
           <p>
-            Create expiring, revocable credentials for selected data. Keys can never change runtime
-            state or download archives.
+            Create expiring, revocable credentials for selected data and actions. Every capability
+            is independently scoped, rate limited, and audited.
           </p>
         </div>
       </section>
@@ -40,16 +40,29 @@
             /></label>
             <fieldset>
               <legend>Scopes</legend>
+              <label><input id="all-api-scopes" type="checkbox" />All admin capabilities</label>
               <label
                 ><input name="scopes" type="checkbox" value="control:read" checked />Control
                 state</label
               ><label
+                ><input name="scopes" type="checkbox" value="control:write" />Control changes</label
+              ><label
                 ><input name="scopes" type="checkbox" value="diagnostics:read" />Diagnostics
                 metadata</label
               ><label
+                ><input name="scopes" type="checkbox" value="diagnostics:download" />Verify and
+                download diagnostics</label
+              ><label
+                ><input name="scopes" type="checkbox" value="diagnostics:delete" />Delete
+                diagnostics</label
+              ><label
                 ><input name="scopes" type="checkbox" value="telemetry:read" />Telemetry
                 summaries</label
-              ><label><input name="scopes" type="checkbox" value="audit:read" />Audit trail</label>
+              ><label><input name="scopes" type="checkbox" value="audit:read" />Audit trail</label
+              ><label
+                ><input name="scopes" type="checkbox" value="keys:manage" />Create and revoke API
+                keys</label
+              >
             </fieldset>
             <label
               ><span>Expires</span
@@ -60,16 +73,20 @@
               </select></label
             ><button class="button primary" type="submit">Create key</button>
           </form>
+          <p class="credential-warning">
+            A key with all capabilities can change live control state, download or delete user
+            diagnostics, and create replacement credentials. Store it as an owner credential.
+          </p>
           <div id="api-key-result" class="grant-result" hidden>
             <div><strong>Copy this key now</strong><span>It will not be shown again.</span></div>
             <textarea id="api-key-token" rows="3" readonly aria-label="New API key"></textarea
             ><button class="button small" id="copy-api-key" type="button">Copy key</button>
           </div>
           <div class="api-catalog">
-            <strong>Data catalog</strong><code>GET https://macro.expeditions.gg/v1/admin-data</code
+            <strong>API catalog</strong><code>GET https://macro.expeditions.gg/v1/admin-data</code
             ><span
-              >Send the key as <code>Authorization: Bearer …</code>. The catalog lists only
-              permitted resources.</span
+              >Send the key as <code>Authorization: Bearer …</code>. The catalog lists every
+              permitted method and resource.</span
             >
           </div>
           <div class="table-scroll">
