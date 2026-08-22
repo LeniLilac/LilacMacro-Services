@@ -56,6 +56,8 @@ Select **All admin capabilities** only for an owner-controlled automation secret
 
 Revoke an unused, copied, or suspected-exposed key immediately. The full token is never recoverable. Last-use time and count are operational hints, not proof that a key was never copied.
 
+Use `scripts/Fetch-AdminDiagnostics.ps1` for bounded incident sweeps instead of manually opening every archive. It lists at most 250 recent records, filters by upload age and compressed size before requesting verification, queues bounded verification requests with rate-limit spacing, polls the selected batch, checks each downloaded byte count, and extracts only bounded text evidence from each ZIP. It writes archives, selected text, and a grouped `report.json` beneath ignored `.local/admin-diagnostics`; it never prints the API key or signed download URLs. Supply `MACROADMIN_API_KEY` through Doppler, for example: `doppler run -- pwsh -NoProfile -File scripts/Fetch-AdminDiagnostics.ps1 -Hours 11 -MaxArchiveMiB 50`. The server still treats diagnostic ZIP members as hostile; this local operator tool skips traversal paths, non-text members, text entries over 64 MiB, and extraction after 256 MiB per archive.
+
 - Keep Cloudflare Always Online disabled for the API origin because it overrides documented stale behavior.
 
 The release worker accepts the newest exact `vX.Y.Z` non-draft release, including GitHub prereleases during public beta, only when all six official assets and their GitHub SHA-256 digests are present. The website fallback links to the repository's complete Releases page because GitHub's `/releases/latest` route excludes prereleases.
