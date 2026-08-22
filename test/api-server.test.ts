@@ -6,8 +6,8 @@ import { CommandService } from '../src/domain/command-service.js';
 import { FixedClock } from '../src/domain/clock.js';
 import { DiagnosticService, type UploadStorage } from '../src/domain/diagnostic-service.js';
 import { PostgresAdminApiKeyStore } from '../src/infrastructure/admin-api-key-store.js';
-import { PostgresConfigurationShareRepository } from '../src/infrastructure/postgres-configuration-share-repository.js';
 import { PostgresAuthStore } from '../src/infrastructure/auth-store.js';
+import { PostgresConfigurationShareRepository } from '../src/infrastructure/postgres-configuration-share-repository.js';
 import { loadConfig, requireApiConfig } from '../src/infrastructure/config.js';
 import {
   MemoryControlRepository,
@@ -20,6 +20,7 @@ import { Ed25519SnapshotSigner } from '../src/infrastructure/snapshot-signer.js'
 import { hashSessionToken, issueCsrfToken } from '../src/infrastructure/session-codec.js';
 import { HmacUploadAuthorizer } from '../src/infrastructure/upload-authorizer.js';
 import { startTemporaryPostgres } from './helpers/postgres.js';
+import { assertDiagnosticInstallationSearch } from './support/diagnostic-installation-search.js';
 import {
   assertBrowserAudit,
   assertFullAccessAudit,
@@ -125,6 +126,10 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     new HmacUploadAuthorizer(config.UPLOAD_AUTH_HMAC_KEY_BASE64),
   );
   const authStore = new PostgresAuthStore(postgres.pool, config.OAUTH_STATE_ENCRYPTION_KEY_BASE64);
+  const pseudonymizer = new RotatingPseudonymizer(
+    config.INSTALL_PSEUDONYM_HMAC_KEY_BASE64,
+    config.NETWORK_PSEUDONYM_HMAC_KEY_BASE64,
+  );
   const app = await buildApi({
     config,
     authStore,
@@ -145,10 +150,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     telemetryRepository,
     configurationShares: new PostgresConfigurationShareRepository(postgres.pool),
     configurationSharingEnabled: true,
-    pseudonymizer: new RotatingPseudonymizer(
-      config.INSTALL_PSEUDONYM_HMAC_KEY_BASE64,
-      config.NETWORK_PSEUDONYM_HMAC_KEY_BASE64,
-    ),
+    pseudonymizer,
   });
 
   try {
@@ -598,6 +600,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(diagnostics.statusCode, 200);
     assert.equal(diagnostics.json()[0].status, 'Stored');
     assert.equal(diagnostics.json()[0].verificationActive, false);
+    await assertDiagnosticInstallationSearch(app, cookie, csrf, grant.id);
     await assertFullAccessDiagnosticMetadata(app, fullApiToken, grant.id);
     const downloadPath = `/admin/api/diagnostics/${grant.id}/download`;
     assert.equal(

@@ -99,6 +99,11 @@ polls do not queue duplicate verification work. Archives that are never requeste
 through the service and are deleted at normal expiry. The legacy grant tables remain inert during the
 rollback-compatibility window, and the worker continues deleting any pre-removal Pending records.
 
+When a user supplies the Installation ID shown in Macro Settings, paste it into the Diagnostics filter.
+The console submits it only in a CSRF-protected request body and derives the current and previous
+monthly diagnostic pseudonyms for the bounded metadata query. Do not copy the UUID into tickets,
+logs, URLs, or retained incident notes after the matching archives have been located.
+
 Deletion is idempotent. A failed provider deletion remains queued and is retried with bounded backoff; stale `Deleting` leases are reclaimed after 15 minutes, and metadata is not reported deleted until storage confirms that every exact-key version and delete marker is absent. Routine Expired metadata continues to consume the global retained-byte budget until that confirmation. A capacity-evicted archive releases its logical allocation while deletion is attempted, but immediately re-enters the budget if provider deletion fails. Provider control requests use explicit deadlines, full-object verification has a size-bounded deadline, and worker shutdown cancels active work and schedules a bounded retry before the container grace period ends. Multipart reconciliation continues through the complete claimed page even when one abort fails. The provisioned one-day Backblaze noncurrent-version and incomplete-multipart lifecycle rule is defense in depth and does not replace application reconciliation.
 
 After inspecting an accepted archive, an administrator should use Delete from the control desk or `/macro-diagnostic action:Delete`. This records the actor, claims the archive with a compare-and-swap status transition, and uses the same provider-confirmed deletion and retry path as automated expiry. Routine retained allocation is capped globally at 1,000 GB so even a continuously full allocation remains under the accepted monthly TB-hour budget. Stored-but-unrequested archives count against retained bytes but not active upload slots.

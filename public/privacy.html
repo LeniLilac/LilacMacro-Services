@@ -125,6 +125,14 @@
         reward research. Aggregates never automatically change macro behavior, reward distributions,
         or remote safety policy.
       </p>
+      <p>
+        Settings displays the installation UUID so you can copy it when support asks for it. If you
+        choose to provide that UUID, an authorized administrator can use it to locate diagnostic
+        archives associated with the same installation during the 72-hour archive-retention window.
+        The search value is sent in a non-cached request, immediately converted to the current and
+        previous monthly diagnostic pseudonyms, and is not stored in archive metadata or returned by
+        the search.
+      </p>
 
       <h3>Deep Debug error uploads</h3>
       <p>
@@ -141,8 +149,9 @@
         Each archive is limited to 3 GiB. The client binds the exact archive size and SHA-256 digest
         to the upload. The archive remains private and is not fully read by the service unless an
         administrator requests a download. A requested archive is verified against its bound size
-        and digest before download; invalid archives are deleted. A successfully sent archive is
-        removed from the local shared Deep Debug folder. A failed upload remains local for review.
+        and digest before download; invalid archives are deleted. Sent and failed archives remain in
+        the local shared Deep Debug folder until the app's configured storage limit requires
+        cleanup.
       </p>
 
       <h3>Administrator authentication and records</h3>

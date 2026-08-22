@@ -18,10 +18,17 @@ import type {
 import type { PostgresAuthStore } from '../infrastructure/auth-store.js';
 import type { ApiServiceConfig } from '../infrastructure/config.js';
 import type { WebControlClient } from '../infrastructure/internal-api-client.js';
+import type { RotatingPseudonymizer } from '../infrastructure/pseudonym.js';
 import { authorizeAdmin, csrfFor } from './auth-routes.js';
 
 const idSchema = z.uuid();
 const listSchema = z.object({ limit: z.coerce.number().int().min(1).max(250).default(100) });
+const diagnosticSearchSchema = z
+  .object({
+    installationId: z.uuid(),
+    limit: z.number().int().min(1).max(250).default(100),
+  })
+  .strict();
 const moderationSchema = z
   .object({
     action: z.literal('delete'),
@@ -47,6 +54,7 @@ export interface AdminRouteDependencies {
   controlClient: WebControlClient;
   clock: Clock;
   diagnosticService: DiagnosticService;
+  pseudonymizer: RotatingPseudonymizer;
   telemetryRepository: TelemetryRepository;
 }
 
@@ -106,6 +114,20 @@ function registerDiagnosticAdminRoutes(
       await dependencies.diagnosticService.list(listSchema.parse(request.query).limit),
     );
   });
+  app.post('/admin/api/diagnostics/search', async (request, reply) => {
+    if (!(await authorizeAdmin(request, reply, auth, true))) return;
+    const input = diagnosticSearchSchema.parse(request.body);
+    return serializeDiagnostics(
+      await dependencies.diagnosticService.list(
+        input.limit,
+        diagnosticInstallPseudonyms(
+          dependencies.pseudonymizer,
+          input.installationId,
+          dependencies.clock.now(),
+        ),
+      ),
+    );
+  });
   app.post('/admin/api/diagnostics/:id/moderate', async (request, reply) => {
     const actor = await authorizeAdmin(request, reply, auth, true);
     if (!actor) return;
@@ -126,6 +148,18 @@ function registerDiagnosticAdminRoutes(
     );
     return reply.code(result.status === 'Accepted' ? 200 : 202).send(result);
   });
+}
+
+export function diagnosticInstallPseudonyms(
+  pseudonymizer: RotatingPseudonymizer,
+  installationId: string,
+  now: Date,
+): readonly string[] {
+  const previousMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  return [
+    pseudonymizer.forInstall(installationId, now),
+    pseudonymizer.forInstall(installationId, previousMonth),
+  ];
 }
 
 function registerAuditRoute(app: FastifyInstance, dependencies: AdminRouteDependencies): void {

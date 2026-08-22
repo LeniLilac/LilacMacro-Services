@@ -2,6 +2,7 @@ const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 let state;
 let commandPending = false;
 const activeDiagnosticDownloads = new Set();
+let diagnosticInstallationId = '';
 const featureIds = [
   'mode.story',
   'mode.raid',
@@ -142,7 +143,12 @@ function renderList(selector, items, label, action) {
 }
 
 async function loadDiagnostics() {
-  const records = await request('/admin/api/diagnostics?limit=100');
+  const records = diagnosticInstallationId
+    ? await request('/admin/api/diagnostics/search', {
+        method: 'POST',
+        body: JSON.stringify({ installationId: diagnosticInstallationId, limit: 100 }),
+      })
+    : await request('/admin/api/diagnostics?limit=100');
   const rows = records.map((record) => {
     const row = document.createElement('tr');
     row.append(
@@ -156,7 +162,14 @@ async function loadDiagnostics() {
     return row;
   });
   document.querySelector('#diagnostic-rows').replaceChildren(...rows);
-  if (!rows.length) renderEmptyRow('#diagnostic-rows', 6, 'No diagnostic uploads.');
+  if (!rows.length)
+    renderEmptyRow(
+      '#diagnostic-rows',
+      6,
+      diagnosticInstallationId
+        ? 'No diagnostic uploads for this installation.'
+        : 'No diagnostic uploads.',
+    );
 }
 
 function diagnosticActions(record) {
@@ -455,6 +468,17 @@ const diagnosticRows = document.querySelector('#diagnostic-rows');
 if (diagnosticRows) {
   document.querySelector('#refresh-diagnostics').onclick = () =>
     void loadDiagnostics().catch((error) => notice(error.message, true));
+  const diagnosticFilterForm = document.querySelector('#diagnostic-filter-form');
+  diagnosticFilterForm.onsubmit = (event) => {
+    event.preventDefault();
+    diagnosticInstallationId = diagnosticFilterForm.installationId.value.trim().toLowerCase();
+    void loadDiagnostics().catch((error) => notice(error.message, true));
+  };
+  document.querySelector('#clear-diagnostic-filter').onclick = () => {
+    diagnosticInstallationId = '';
+    diagnosticFilterForm.reset();
+    void loadDiagnostics().catch((error) => notice(error.message, true));
+  };
 }
 const telemetryRows = document.querySelector('#telemetry-rows');
 if (telemetryRows)

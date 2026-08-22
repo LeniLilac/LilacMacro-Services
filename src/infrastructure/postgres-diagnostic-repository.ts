@@ -168,10 +168,15 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
     return result.rowCount ? mapDiagnostic(result.rows[0]) : null;
   }
 
-  public async list(limit: number): Promise<DiagnosticUploadRecord[]> {
+  public async list(
+    limit: number,
+    installPseudonyms: readonly string[] = [],
+  ): Promise<DiagnosticUploadRecord[]> {
     const result = await this.pool.query(
-      'SELECT * FROM diagnostic_uploads ORDER BY created_at DESC LIMIT $1',
-      [limit],
+      `SELECT * FROM diagnostic_uploads
+       WHERE cardinality($2::text[]) = 0 OR install_pseudonym = ANY($2::text[])
+       ORDER BY created_at DESC LIMIT $1`,
+      [limit, installPseudonyms],
     );
     return result.rows.map(mapDiagnostic);
   }

@@ -198,8 +198,13 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
     return record ? structuredClone(record) : null;
   }
 
-  public async list(limit: number): Promise<DiagnosticUploadRecord[]> {
+  public async list(
+    limit: number,
+    installPseudonyms: readonly string[] = [],
+  ): Promise<DiagnosticUploadRecord[]> {
+    const filters = new Set(installPseudonyms);
     return [...this.records.values()]
+      .filter((record) => filters.size === 0 || filters.has(record.installPseudonym))
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .slice(0, limit)
       .map((record) => structuredClone(record));

@@ -35,6 +35,23 @@
       <div id="notice" class="notice" role="status" hidden></div>
       <section class="admin-grid single-purpose">
         <article class="panel panel-wide">
+          <form id="diagnostic-filter-form" class="diagnostic-filter-form">
+            <label>
+              <span>Installation ID</span>
+              <input
+                name="installationId"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="00000000-0000-0000-0000-000000000000"
+                pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"
+                required
+              />
+            </label>
+            <button class="button" type="submit">Filter</button>
+            <button class="button" id="clear-diagnostic-filter" type="button">Clear</button>
+          </form>
           <div class="table-scroll">
             <table>
               <thead>

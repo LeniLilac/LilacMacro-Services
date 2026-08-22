@@ -567,6 +567,17 @@ select {
   background: var(--paper-2);
   border: 1px solid #bbaab3;
 }
+.diagnostic-filter-form {
+  display: grid;
+  grid-template-columns: minmax(320px, 540px) auto auto;
+  align-items: end;
+  justify-content: start;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.diagnostic-filter-form input {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
 .api-key-form fieldset {
   display: flex;
   flex-wrap: wrap;
@@ -827,6 +838,9 @@ dialog::backdrop {
   .api-key-form {
     grid-template-columns: 1fr;
   }
+  .diagnostic-filter-form {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
   .tool-links {
     grid-template-columns: 1fr;
   }
@@ -840,6 +854,12 @@ dialog::backdrop {
   }
 }
 @media (max-width: 620px) {
+  .diagnostic-filter-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .diagnostic-filter-form label {
+    grid-column: 1 / -1;
+  }
   .document {
     margin: 24px 14px;
     padding: 28px 22px;

@@ -268,8 +268,12 @@ export class DiagnosticService {
     await this.maintenance.requestDeletionByAdministrator(record, actor);
   }
 
-  public async list(limit = 100): Promise<DiagnosticUploadRecord[]> {
-    return this.repository.list(Math.min(Math.max(limit, 1), 250));
+  public async list(
+    limit = 100,
+    installPseudonyms: readonly string[] = [],
+  ): Promise<DiagnosticUploadRecord[]> {
+    const filters = [...new Set(installPseudonyms)].slice(0, 2);
+    return this.repository.list(Math.min(Math.max(limit, 1), 250), filters);
   }
 
   public async status(id: string, token: string): Promise<UploadStatusView> {

@@ -107,7 +107,7 @@ export interface DiagnosticRepository {
     audit: DiagnosticAuditEvent,
   ): Promise<boolean>;
   find(id: string): Promise<DiagnosticUploadRecord | null>;
-  list(limit: number): Promise<DiagnosticUploadRecord[]>;
+  list(limit: number, installPseudonyms?: readonly string[]): Promise<DiagnosticUploadRecord[]>;
   setProviderUploadId(id: string, providerUploadId: string): Promise<boolean>;
   registerPartGrant(id: string, partNumber: number, grant: MultipartPartGrant): Promise<boolean>;
   transition(

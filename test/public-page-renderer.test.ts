@@ -82,6 +82,8 @@ test('legal pages publish direct contact and the implemented privacy controls', 
   assert.match(privacy, /no later than 72 hours after upload/);
   assert.match(privacy, /not fully read by the service unless an\s+administrator requests/);
   assert.match(privacy, /no manual diagnostic-upload feature/);
+  assert.match(privacy, /Settings displays the installation UUID/);
+  assert.match(privacy, /Sent and failed archives remain/);
   assert.match(privacy, /shared 1,000 GB allocation/);
   assert.doesNotMatch(
     privacy,

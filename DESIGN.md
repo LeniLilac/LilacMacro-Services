@@ -17,6 +17,7 @@ The site and admin console extend LilacMacro's SquareClaim-inspired paper-and-in
 - Every action exposes its current value, effective time, actor, and audit result.
 - Confirmation dialogs name the exact effect. Destructive and safety-impacting operations cannot share primary-action styling.
 - Diagnostic downloads progress from Stored to Verifying to Accepted; the initiating browser waits in place and starts the download automatically when verification succeeds.
+- Diagnostics accepts a copied installation UUID in one compact filter row. The UUID is submitted in a no-store, CSRF-protected request body; the table continues to expose archive metadata rather than raw or stored installation identity.
 - Loading uses shaped skeletons; empty states explain the next legitimate action in one sentence.
 
 ## Visual system

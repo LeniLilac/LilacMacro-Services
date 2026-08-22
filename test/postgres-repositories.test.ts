@@ -171,6 +171,11 @@ test('Postgres diagnostic repository enforces quotas, bound parts, audit, and re
     createdAt: now,
   });
   assert.equal((await repository.list(10)).length >= 1, true);
+  assert.deepEqual(
+    (await repository.list(10, [record.installPseudonym])).map((item) => item.id).sort(),
+    (await repository.list(10)).map((item) => item.id).sort(),
+  );
+  assert.deepEqual(await repository.list(10, ['unrelated-installation']), []);
   assert.equal(
     (await repository.listAudit(record.id, 10)).some(
       (event) => event.action === 'moderation.delete',
