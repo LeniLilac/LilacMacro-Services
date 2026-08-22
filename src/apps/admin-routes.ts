@@ -20,15 +20,16 @@ import type { ApiServiceConfig } from '../infrastructure/config.js';
 import type { WebControlClient } from '../infrastructure/internal-api-client.js';
 import type { RotatingPseudonymizer } from '../infrastructure/pseudonym.js';
 import { authorizeAdmin, csrfFor } from './auth-routes.js';
+import {
+  diagnosticInstallPseudonyms,
+  diagnosticListFilters,
+  diagnosticSearchSchema,
+} from './diagnostic-admin-search.js';
+
+export { diagnosticInstallPseudonyms } from './diagnostic-admin-search.js';
 
 const idSchema = z.uuid();
 const listSchema = z.object({ limit: z.coerce.number().int().min(1).max(250).default(100) });
-const diagnosticSearchSchema = z
-  .object({
-    installationId: z.uuid(),
-    limit: z.number().int().min(1).max(250).default(100),
-  })
-  .strict();
 const moderationSchema = z
   .object({
     action: z.literal('delete'),
@@ -120,11 +121,7 @@ function registerDiagnosticAdminRoutes(
     return serializeDiagnostics(
       await dependencies.diagnosticService.list(
         input.limit,
-        diagnosticInstallPseudonyms(
-          dependencies.pseudonymizer,
-          input.installationId,
-          dependencies.clock.now(),
-        ),
+        diagnosticListFilters(input, dependencies.pseudonymizer, dependencies.clock.now()),
       ),
     );
   });
@@ -148,18 +145,6 @@ function registerDiagnosticAdminRoutes(
     );
     return reply.code(result.status === 'Accepted' ? 200 : 202).send(result);
   });
-}
-
-export function diagnosticInstallPseudonyms(
-  pseudonymizer: RotatingPseudonymizer,
-  installationId: string,
-  now: Date,
-): readonly string[] {
-  const previousMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  return [
-    pseudonymizer.forInstall(installationId, now),
-    pseudonymizer.forInstall(installationId, previousMonth),
-  ];
 }
 
 function registerAuditRoute(app: FastifyInstance, dependencies: AdminRouteDependencies): void {
@@ -242,6 +227,20 @@ function registerAdminDataRoutes(app: FastifyInstance, dependencies: AdminRouteD
       await dependencies.diagnosticService.list(adminDataQuerySchema.parse(request.query).limit),
     );
   });
+  app.post(
+    '/v1/admin-data/diagnostics/search',
+    { config: apiKeyRateLimit },
+    async (request, reply) => {
+      if (!(await authorizeApiKey(request, reply, dependencies, 'diagnostics:read'))) return;
+      const input = diagnosticSearchSchema.parse(request.body);
+      return serializeDiagnostics(
+        await dependencies.diagnosticService.list(
+          input.limit,
+          diagnosticListFilters(input, dependencies.pseudonymizer, dependencies.clock.now()),
+        ),
+      );
+    },
+  );
   app.post(
     '/v1/admin-data/diagnostics/:id/download',
     { config: apiKeyMutationRateLimit },
@@ -339,7 +338,14 @@ const adminResourcesByScope: Record<AdminApiKeyScope, readonly AdminResource[]> 
       method: 'POST',
     },
   ],
-  'diagnostics:read': [{ scope: 'diagnostics:read', href: '/v1/admin-data/diagnostics' }],
+  'diagnostics:read': [
+    { scope: 'diagnostics:read', href: '/v1/admin-data/diagnostics' },
+    {
+      scope: 'diagnostics:read',
+      href: '/v1/admin-data/diagnostics/search',
+      method: 'POST',
+    },
+  ],
   'diagnostics:download': [
     {
       scope: 'diagnostics:download',
@@ -419,6 +425,8 @@ function serializeDiagnostics(records: Awaited<ReturnType<DiagnosticService['lis
     sizeBytes: record.request.sizeBytes,
     kind: record.request.kind,
     appVersion: record.request.appVersion,
+    osVersion: record.request.osVersion ?? null,
+    installationRef: record.installPseudonym.slice(0, 12),
     status:
       record.status === 'Pending' && record.acceptanceDeadline === null
         ? 'Stored'

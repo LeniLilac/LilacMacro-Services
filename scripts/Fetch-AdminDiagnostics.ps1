@@ -6,6 +6,15 @@ param(
     [ValidateRange(1, 3072)]
     [int]$MaxArchiveMiB = 50,
 
+    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [string]$MinimumAppVersion = '',
+
+    [ValidatePattern('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$')]
+    [string]$InstallationId = '',
+
+    [ValidateLength(0, 160)]
+    [string]$OsVersion = '',
+
     [ValidatePattern('^https://')]
     [string]$Origin = 'https://macro.expeditions.gg',
 
@@ -48,11 +57,14 @@ function Invoke-AdminApi {
         [string]$Method,
 
         [Parameter(Mandatory)]
-        [string]$Path
+        [string]$Path,
+
+        [object]$Body = $null
     )
 
     if ($Method -eq 'POST') {
-        Invoke-RestMethod -Method $Method -Uri "$originRoot$Path" -Headers $headers -ContentType 'application/json' -Body '{}'
+        $json = if ($null -eq $Body) { '{}' } else { $Body | ConvertTo-Json -Compress }
+        Invoke-RestMethod -Method $Method -Uri "$originRoot$Path" -Headers $headers -ContentType 'application/json' -Body $json
     }
     else {
         Invoke-RestMethod -Method $Method -Uri "$originRoot$Path" -Headers $headers
@@ -121,6 +133,9 @@ function Save-DiagnosticDownload {
         FileName = $Record.fileName
         CreatedAt = $Record.createdAt
         SizeBytes = [int64]$Record.sizeBytes
+        AppVersion = $Record.appVersion
+        OsVersion = $Record.osVersion
+        InstallationRef = $Record.installationRef
         ArchivePath = $archivePath
         Error = $null
     }
@@ -222,7 +237,21 @@ function Get-FailureFindings {
 
 $cutoff = [DateTimeOffset]::UtcNow.AddHours(-$Hours)
 $maxBytes = [int64]$MaxArchiveMiB * 1MB
-$rawRecords = Invoke-AdminApi -Method GET -Path '/v1/admin-data/diagnostics?limit=250'
+$search = [ordered]@{
+    limit = 250
+    createdAfter = $cutoff.ToString('O')
+    maximumSizeBytes = $maxBytes
+}
+if (-not [string]::IsNullOrWhiteSpace($MinimumAppVersion)) {
+    $search.minimumAppVersion = $MinimumAppVersion
+}
+if (-not [string]::IsNullOrWhiteSpace($InstallationId)) {
+    $search.installationId = $InstallationId.ToLowerInvariant()
+}
+if (-not [string]::IsNullOrWhiteSpace($OsVersion)) {
+    $search.osVersion = $OsVersion.Trim()
+}
+$rawRecords = Invoke-AdminApi -Method POST -Path '/v1/admin-data/diagnostics/search' -Body $search
 # Invoke-RestMethod intentionally writes a top-level JSON array as one pipeline object.
 # Cast it explicitly so filtering operates on individual diagnostic records.
 $records = [object[]]$rawRecords
@@ -255,6 +284,9 @@ foreach ($record in $selected) {
             FileName = $record.fileName
             CreatedAt = $record.createdAt
             SizeBytes = [int64]$record.sizeBytes
+            AppVersion = $record.appVersion
+            OsVersion = $record.osVersion
+            InstallationRef = $record.installationRef
             ArchivePath = $null
             Error = $_.Exception.Message
         })
@@ -281,6 +313,9 @@ while ($pending.Count -gt 0 -and [DateTimeOffset]::UtcNow -lt $verificationDeadl
                 FileName = $record.fileName
                 CreatedAt = $record.createdAt
                 SizeBytes = [int64]$record.sizeBytes
+                AppVersion = $record.appVersion
+                OsVersion = $record.osVersion
+                InstallationRef = $record.installationRef
                 ArchivePath = $null
                 Error = $_.Exception.Message
             })
@@ -297,6 +332,9 @@ foreach ($record in $pending) {
         FileName = $record.fileName
         CreatedAt = $record.createdAt
         SizeBytes = [int64]$record.sizeBytes
+        AppVersion = $record.appVersion
+        OsVersion = $record.osVersion
+        InstallationRef = $record.installationRef
         ArchivePath = $null
         Error = "Verification did not finish within $VerificationTimeoutMinutes minutes."
     })
@@ -320,6 +358,9 @@ $report = [ordered]@{
     Filter = [ordered]@{
         Hours = $Hours
         MaxArchiveMiB = $MaxArchiveMiB
+        MinimumAppVersion = $MinimumAppVersion
+        InstallationIdSupplied = -not [string]::IsNullOrWhiteSpace($InstallationId)
+        OsVersion = $OsVersion
         Cutoff = $cutoff.ToString('O')
     }
     Listed = $records.Count

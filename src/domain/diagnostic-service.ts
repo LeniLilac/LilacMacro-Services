@@ -13,6 +13,7 @@ import {
 import { decideUpload, diagnosticQuotaLimits } from './diagnostic-policy.js';
 import type {
   Actor,
+  DiagnosticListFilters,
   DiagnosticAuditRecord,
   DiagnosticRepository,
   DiagnosticUploadRecord,
@@ -270,10 +271,13 @@ export class DiagnosticService {
 
   public async list(
     limit = 100,
-    installPseudonyms: readonly string[] = [],
+    filters: DiagnosticListFilters = {},
   ): Promise<DiagnosticUploadRecord[]> {
-    const filters = [...new Set(installPseudonyms)].slice(0, 2);
-    return this.repository.list(Math.min(Math.max(limit, 1), 250), filters);
+    const installPseudonyms = [...new Set(filters.installPseudonyms ?? [])].slice(0, 2);
+    return this.repository.list(Math.min(Math.max(limit, 1), 250), {
+      ...filters,
+      installPseudonyms,
+    });
   }
 
   public async status(id: string, token: string): Promise<UploadStatusView> {

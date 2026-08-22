@@ -46,8 +46,33 @@
                 spellcheck="false"
                 placeholder="00000000-0000-0000-0000-000000000000"
                 pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"
-                required
               />
+            </label>
+            <label>
+              <span>Minimum version</span>
+              <input
+                name="minimumAppVersion"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="1.0.160"
+                pattern="[0-9]+\.[0-9]+\.[0-9]+"
+              />
+            </label>
+            <label>
+              <span>OS version contains</span>
+              <input
+                name="osVersion"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="19045.6456"
+              />
+            </label>
+            <label>
+              <span>Within hours</span>
+              <input name="hours" type="number" inputmode="numeric" min="1" max="72" />
             </label>
             <button class="button" type="submit">Filter</button>
             <button class="button" id="clear-diagnostic-filter" type="button">Clear</button>
@@ -57,6 +82,9 @@
               <thead>
                 <tr>
                   <th>Archive</th>
+                  <th>Install ref</th>
+                  <th>Version</th>
+                  <th>OS version</th>
                   <th>Size</th>
                   <th>Status</th>
                   <th>Uploaded</th>

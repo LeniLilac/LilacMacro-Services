@@ -127,6 +127,18 @@ export async function assertFullAccessDiagnosticMetadata(
   });
   assert.equal(response.statusCode, 200);
   assert.equal(response.json()[0].id, id);
+  assert.equal(response.json()[0].appVersion, '1.0.115');
+  assert.equal(response.json()[0].osVersion, 'Microsoft Windows NT 10.0.19045.6456');
+  assert.match(response.json()[0].installationRef, /^[A-Za-z0-9_-]{12}$/);
+
+  const filtered = await app.inject({
+    method: 'POST',
+    url: '/v1/admin-data/diagnostics/search',
+    headers: { authorization: `Bearer ${token}` },
+    payload: { minimumAppVersion: '1.0.115', osVersion: '19045.6456', limit: 10 },
+  });
+  assert.equal(filtered.statusCode, 200);
+  assert.equal(filtered.json()[0].id, id);
 }
 
 export async function requestFullAccessDiagnosticDownload(

@@ -139,19 +139,24 @@
         LilacMacro has no manual diagnostic-upload feature and does not create a smaller fallback
         report. When both Deep Debug logging and automatic error uploads are enabled, a classified
         error can send the completed Deep Debug archive. An archive can contain the run's structured
-        timeline, macro actions, sanitized logs and configuration context, and selected Roblox
-        frames from important transitions and approximately 10 seconds before and after classified
-        errors. Frames can contain information visible inside Roblox. Archives exclude credentials,
-        webhook URLs, private-server links, and raw file paths through client-side redaction, but no
+        timeline, macro actions, sanitized logs and configuration context, and one-second Roblox
+        frames. The app retains the complete compressed frame stream while the archive fits below 3
+        GiB; only under archive pressure does it remove lower-priority frames while protecting
+        important transitions and approximately 10 seconds before and after classified errors.
+        Frames can contain information visible inside Roblox. Archives exclude credentials, webhook
+        URLs, private-server links, and raw file paths through client-side redaction, but no
         redaction system is perfect.
       </p>
       <p>
         Each archive is limited to 3 GiB. The client binds the exact archive size and SHA-256 digest
-        to the upload. The archive remains private and is not fully read by the service unless an
-        administrator requests a download. A requested archive is verified against its bound size
-        and digest before download; invalid archives are deleted. Sent and failed archives remain in
-        the local shared Deep Debug folder until the app's configured storage limit requires
-        cleanup.
+        to the upload and sends its application version, complete Windows version, and random
+        installation UUID as diagnostic metadata. The service immediately replaces the UUID with
+        rotating diagnostic pseudonyms; it retains the two version fields so authorized support can
+        narrow incident searches without first downloading private captures. The archive remains
+        private and is not fully read by the service unless an administrator requests a download. A
+        requested archive is verified against its bound size and digest before download; invalid
+        archives are deleted. Sent and failed archives remain in the local shared Deep Debug folder
+        until the app's configured storage limit requires cleanup.
       </p>
 
       <h3>Administrator authentication and records</h3>

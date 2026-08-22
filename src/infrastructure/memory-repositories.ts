@@ -11,6 +11,7 @@ import type {
   ControlRepository,
   DiagnosticAuditEvent,
   DiagnosticAuditRecord,
+  DiagnosticListFilters,
   DiagnosticQuotaLimits,
   DiagnosticRepository,
   DiagnosticUploadRecord,
@@ -200,11 +201,22 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
 
   public async list(
     limit: number,
-    installPseudonyms: readonly string[] = [],
+    filters: DiagnosticListFilters = {},
   ): Promise<DiagnosticUploadRecord[]> {
-    const filters = new Set(installPseudonyms);
+    const installPseudonyms = new Set(filters.installPseudonyms ?? []);
     return [...this.records.values()]
-      .filter((record) => filters.size === 0 || filters.has(record.installPseudonym))
+      .filter(
+        (record) =>
+          (installPseudonyms.size === 0 || installPseudonyms.has(record.installPseudonym)) &&
+          (!filters.minimumAppVersion ||
+            compareVersions(record.request.appVersion, filters.minimumAppVersion) >= 0) &&
+          (!filters.osVersion ||
+            (record.request.osVersion ?? '')
+              .toLowerCase()
+              .includes(filters.osVersion.toLowerCase())) &&
+          (!filters.createdAfter || record.createdAt >= filters.createdAfter) &&
+          (!filters.maximumSizeBytes || record.request.sizeBytes <= filters.maximumSizeBytes),
+      )
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .slice(0, limit)
       .map((record) => structuredClone(record));
@@ -389,4 +401,14 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
   private recordAudit(uploadId: string, event: DiagnosticAuditEvent): void {
     this.audit.push({ id: this.nextAuditId++, uploadId, ...structuredClone(event) });
   }
+}
+
+function compareVersions(left: string, right: string): number {
+  const leftParts = left.split('.').map(Number);
+  const rightParts = right.split('.').map(Number);
+  for (let index = 0; index < 3; index++) {
+    const difference = leftParts[index]! - rightParts[index]!;
+    if (difference !== 0) return difference;
+  }
+  return 0;
 }

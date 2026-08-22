@@ -2,7 +2,7 @@ const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 let state;
 let commandPending = false;
 const activeDiagnosticDownloads = new Set();
-let diagnosticInstallationId = '';
+let diagnosticFilters = {};
 const featureIds = [
   'mode.story',
   'mode.raid',
@@ -143,16 +143,19 @@ function renderList(selector, items, label, action) {
 }
 
 async function loadDiagnostics() {
-  const records = diagnosticInstallationId
+  const records = Object.keys(diagnosticFilters).length
     ? await request('/admin/api/diagnostics/search', {
         method: 'POST',
-        body: JSON.stringify({ installationId: diagnosticInstallationId, limit: 100 }),
+        body: JSON.stringify({ ...diagnosticFilters, limit: 100 }),
       })
     : await request('/admin/api/diagnostics?limit=100');
   const rows = records.map((record) => {
     const row = document.createElement('tr');
     row.append(
       cell(record.fileName),
+      cell(record.installationRef),
+      cell(record.appVersion),
+      cell(record.osVersion || 'Legacy upload'),
       cell(formatBytes(record.sizeBytes)),
       statusCell(record.status),
       cell(formatDate(record.createdAt)),
@@ -165,9 +168,9 @@ async function loadDiagnostics() {
   if (!rows.length)
     renderEmptyRow(
       '#diagnostic-rows',
-      6,
-      diagnosticInstallationId
-        ? 'No diagnostic uploads for this installation.'
+      9,
+      Object.keys(diagnosticFilters).length
+        ? 'No diagnostic uploads match these filters.'
         : 'No diagnostic uploads.',
     );
 }
@@ -471,11 +474,22 @@ if (diagnosticRows) {
   const diagnosticFilterForm = document.querySelector('#diagnostic-filter-form');
   diagnosticFilterForm.onsubmit = (event) => {
     event.preventDefault();
-    diagnosticInstallationId = diagnosticFilterForm.installationId.value.trim().toLowerCase();
+    const installationId = diagnosticFilterForm.installationId.value.trim().toLowerCase();
+    const minimumAppVersion = diagnosticFilterForm.minimumAppVersion.value.trim();
+    const osVersion = diagnosticFilterForm.osVersion.value.trim();
+    const hours = Number(diagnosticFilterForm.hours.value);
+    diagnosticFilters = {
+      ...(installationId ? { installationId } : {}),
+      ...(minimumAppVersion ? { minimumAppVersion } : {}),
+      ...(osVersion ? { osVersion } : {}),
+      ...(hours > 0
+        ? { createdAfter: new Date(Date.now() - hours * 3_600_000).toISOString() }
+        : {}),
+    };
     void loadDiagnostics().catch((error) => notice(error.message, true));
   };
   document.querySelector('#clear-diagnostic-filter').onclick = () => {
-    diagnosticInstallationId = '';
+    diagnosticFilters = {};
     diagnosticFilterForm.reset();
     void loadDiagnostics().catch((error) => notice(error.message, true));
   };

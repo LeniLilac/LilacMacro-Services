@@ -21,7 +21,14 @@ export async function assertDiagnosticInstallationSearch(
     method: 'POST',
     url: '/admin/api/diagnostics/search',
     headers: { cookie, 'x-csrf-token': csrf },
-    payload: { installationId: matchingInstallationId, limit: 100 },
+    payload: {
+      installationId: matchingInstallationId,
+      minimumAppVersion: '1.0.115',
+      osVersion: '19045.6456',
+      createdAfter: '2026-08-14T11:59:00.000Z',
+      maximumSizeBytes: 1_024,
+      limit: 100,
+    },
   });
   assert.equal(matching.statusCode, 200);
   assert.deepEqual(
@@ -29,6 +36,22 @@ export async function assertDiagnosticInstallationSearch(
     [expectedUploadId],
   );
   assert.doesNotMatch(matching.body, new RegExp(matchingInstallationId));
+
+  for (const payload of [
+    { minimumAppVersion: '1.0.116', limit: 100 },
+    { osVersion: 'Windows 11', limit: 100 },
+    { createdAfter: '2026-08-14T12:01:00.000Z', limit: 100 },
+    { maximumSizeBytes: 1_023, limit: 100 },
+  ]) {
+    const excluded = await app.inject({
+      method: 'POST',
+      url: '/admin/api/diagnostics/search',
+      headers: { cookie, 'x-csrf-token': csrf },
+      payload,
+    });
+    assert.equal(excluded.statusCode, 200);
+    assert.deepEqual(excluded.json(), []);
+  }
 
   const unrelated = await app.inject({
     method: 'POST',

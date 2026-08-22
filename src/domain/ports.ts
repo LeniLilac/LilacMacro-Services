@@ -99,6 +99,14 @@ export interface DiagnosticQuotaLimits {
   globalRetainedBytes: number;
 }
 
+export interface DiagnosticListFilters {
+  installPseudonyms?: readonly string[];
+  minimumAppVersion?: string;
+  osVersion?: string;
+  createdAfter?: Date;
+  maximumSizeBytes?: number;
+}
+
 export interface DiagnosticRepository {
   insertWithinQuota(
     record: DiagnosticUploadRecord,
@@ -107,7 +115,7 @@ export interface DiagnosticRepository {
     audit: DiagnosticAuditEvent,
   ): Promise<boolean>;
   find(id: string): Promise<DiagnosticUploadRecord | null>;
-  list(limit: number, installPseudonyms?: readonly string[]): Promise<DiagnosticUploadRecord[]>;
+  list(limit: number, filters?: DiagnosticListFilters): Promise<DiagnosticUploadRecord[]>;
   setProviderUploadId(id: string, providerUploadId: string): Promise<boolean>;
   registerPartGrant(id: string, partNumber: number, grant: MultipartPartGrant): Promise<boolean>;
   transition(

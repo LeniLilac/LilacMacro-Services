@@ -9,6 +9,7 @@ import type {
   Actor,
   DiagnosticAuditEvent,
   DiagnosticAuditRecord,
+  DiagnosticListFilters,
   DiagnosticQuotaLimits,
   DiagnosticRepository,
   DiagnosticUploadRecord,
@@ -170,13 +171,28 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
 
   public async list(
     limit: number,
-    installPseudonyms: readonly string[] = [],
+    filters: DiagnosticListFilters = {},
   ): Promise<DiagnosticUploadRecord[]> {
+    const installPseudonyms = filters.installPseudonyms ?? [];
     const result = await this.pool.query(
       `SELECT * FROM diagnostic_uploads
-       WHERE cardinality($2::text[]) = 0 OR install_pseudonym = ANY($2::text[])
+       WHERE (cardinality($2::text[]) = 0 OR install_pseudonym = ANY($2::text[]))
+         AND ($3::text IS NULL OR
+              string_to_array(request->>'appVersion', '.')::numeric[] >=
+              string_to_array($3::text, '.')::numeric[])
+         AND ($4::text IS NULL OR
+              position(lower($4::text) in lower(COALESCE(request->>'osVersion', ''))) > 0)
+         AND ($5::timestamptz IS NULL OR created_at >= $5::timestamptz)
+         AND ($6::bigint IS NULL OR (request->>'sizeBytes')::bigint <= $6::bigint)
        ORDER BY created_at DESC LIMIT $1`,
-      [limit, installPseudonyms],
+      [
+        limit,
+        installPseudonyms,
+        filters.minimumAppVersion ?? null,
+        filters.osVersion ?? null,
+        filters.createdAfter ?? null,
+        filters.maximumSizeBytes ?? null,
+      ],
     );
     return result.rows.map(mapDiagnostic);
   }

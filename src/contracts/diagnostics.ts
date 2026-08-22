@@ -3,6 +3,10 @@ import { z } from 'zod';
 export const oneGiB = 1024 ** 3;
 export const maximumArchiveBytes = 3 * oneGiB;
 export const multipartPartBytes = 128 * 1024 ** 2;
+export const diagnosticVersionSchema = z
+  .string()
+  .max(32)
+  .regex(/^\d+\.\d+\.\d+$/);
 
 export const diagnosticKindSchema = z.enum([
   'deep-debug',
@@ -25,7 +29,8 @@ export const createUploadRequestSchema = z
     sha256: z.string().regex(/^[a-f0-9]{64}$/i),
     kind: acceptedDiagnosticKindSchema,
     explicitConsent: z.literal(true),
-    appVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+    appVersion: diagnosticVersionSchema,
+    osVersion: z.string().trim().min(1).max(160).optional(),
   })
   .strict();
 

@@ -45,7 +45,7 @@ Start at `GET /v1/admin-data` with `Authorization: Bearer <key>`. The returned c
 
 - `control:read` → `/v1/admin-data/control`
 - `control:write` → `POST /v1/admin-data/control/commands` (administrator-owned closed command envelopes only)
-- `diagnostics:read` → `/v1/admin-data/diagnostics?limit=100` (metadata only)
+- `diagnostics:read` → `/v1/admin-data/diagnostics?limit=100` and `POST /v1/admin-data/diagnostics/search` (metadata only; the POST accepts bounded installation, minimum-version, OS-substring, age, and size filters)
 - `diagnostics:download` → `POST /v1/admin-data/diagnostics/{id}/download` (queues on-demand verification; poll until the response contains the short-lived URL)
 - `diagnostics:delete` → `DELETE /v1/admin-data/diagnostics/{id}`
 - `telemetry:read` → `/v1/admin-data/telemetry?days=30` (bounded aggregates only)
@@ -56,7 +56,7 @@ Select **All admin capabilities** only for an owner-controlled automation secret
 
 Revoke an unused, copied, or suspected-exposed key immediately. The full token is never recoverable. Last-use time and count are operational hints, not proof that a key was never copied.
 
-Use `scripts/Fetch-AdminDiagnostics.ps1` for bounded incident sweeps instead of manually opening every archive. It lists at most 250 recent records, filters by upload age and compressed size before requesting verification, queues bounded verification requests with rate-limit spacing, polls the selected batch, checks each downloaded byte count, and extracts only bounded text evidence from each ZIP. It writes archives, selected text, and a grouped `report.json` beneath ignored `.local/admin-diagnostics`; it never prints the API key or signed download URLs. Supply `MACROADMIN_API_KEY` through Doppler, for example: `doppler run -- pwsh -NoProfile -File scripts/Fetch-AdminDiagnostics.ps1 -Hours 11 -MaxArchiveMiB 50`. The server still treats diagnostic ZIP members as hostile; this local operator tool skips traversal paths, non-text members, text entries over 64 MiB, and extraction after 256 MiB per archive.
+Use `scripts/Fetch-AdminDiagnostics.ps1` for bounded incident sweeps instead of manually opening every archive. It asks the server for at most 250 records matching upload age and compressed size, with optional minimum application version, OS substring, and installation UUID filters, before requesting verification. It queues bounded verification requests with rate-limit spacing, polls the selected batch, checks each downloaded byte count, and extracts only bounded text evidence from each ZIP. It writes archives, selected text, and a grouped `report.json` beneath ignored `.local/admin-diagnostics`; it never prints the API key, raw installation ID, or signed download URLs. Supply `MACROADMIN_API_KEY` through Doppler, for example: `doppler run -- pwsh -NoProfile -File scripts/Fetch-AdminDiagnostics.ps1 -Hours 11 -MaxArchiveMiB 50 -MinimumAppVersion 1.0.163`. The server still treats diagnostic ZIP members as hostile; this local operator tool skips traversal paths, non-text members, text entries over 64 MiB, and extraction after 256 MiB per archive.
 
 - Keep Cloudflare Always Online disabled for the API origin because it overrides documented stale behavior.
 
@@ -99,10 +99,13 @@ polls do not queue duplicate verification work. Archives that are never requeste
 through the service and are deleted at normal expiry. The legacy grant tables remain inert during the
 rollback-compatibility window, and the worker continues deleting any pre-removal Pending records.
 
-When a user supplies the Installation ID shown in Macro Settings, paste it into the Diagnostics filter.
-The console submits it only in a CSRF-protected request body and derives the current and previous
-monthly diagnostic pseudonyms for the bounded metadata query. Do not copy the UUID into tickets,
-logs, URLs, or retained incident notes after the matching archives have been located.
+The Diagnostics page displays current-client application version, complete Windows version, and a
+short rotating installation reference without opening an archive. Searches can combine a minimum
+application version, Windows-version substring, upload time, compressed size, and the Installation
+ID shown in Macro Settings. The console submits a raw ID only in a CSRF-protected request body and
+derives the current and previous monthly diagnostic pseudonyms for the bounded metadata query. Do
+not copy the UUID into tickets, logs, URLs, or retained incident notes after the matching archives
+have been located.
 
 Deletion is idempotent. A failed provider deletion remains queued and is retried with bounded backoff; stale `Deleting` leases are reclaimed after 15 minutes, and metadata is not reported deleted until storage confirms that every exact-key version and delete marker is absent. Routine Expired metadata continues to consume the global retained-byte budget until that confirmation. A capacity-evicted archive releases its logical allocation while deletion is attempted, but immediately re-enters the budget if provider deletion fails. Provider control requests use explicit deadlines, full-object verification has a size-bounded deadline, and worker shutdown cancels active work and schedules a bounded retry before the container grace period ends. Multipart reconciliation continues through the complete claimed page even when one abort fails. The provisioned one-day Backblaze noncurrent-version and incomplete-multipart lifecycle rule is defense in depth and does not replace application reconciliation.
 

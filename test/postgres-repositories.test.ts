@@ -172,10 +172,28 @@ test('Postgres diagnostic repository enforces quotas, bound parts, audit, and re
   });
   assert.equal((await repository.list(10)).length >= 1, true);
   assert.deepEqual(
-    (await repository.list(10, [record.installPseudonym])).map((item) => item.id).sort(),
+    (await repository.list(10, { installPseudonyms: [record.installPseudonym] }))
+      .map((item) => item.id)
+      .sort(),
     (await repository.list(10)).map((item) => item.id).sort(),
   );
-  assert.deepEqual(await repository.list(10, ['unrelated-installation']), []);
+  assert.deepEqual(
+    await repository.list(10, { installPseudonyms: ['unrelated-installation'] }),
+    [],
+  );
+  assert.equal(
+    (
+      await repository.list(10, {
+        minimumAppVersion: '1.0.111',
+        osVersion: '19045.6456',
+        createdAfter: new Date(now.getTime() - 1),
+        maximumSizeBytes: 1_000,
+      })
+    ).some((item) => item.id === record.id),
+    true,
+  );
+  assert.deepEqual(await repository.list(10, { minimumAppVersion: '1.0.112' }), []);
+  assert.deepEqual(await repository.list(10, { osVersion: 'Windows 11' }), []);
   assert.equal(
     (await repository.listAudit(record.id, 10)).some(
       (event) => event.action === 'moderation.delete',
@@ -593,6 +611,7 @@ function diagnosticRecord(now: Date, id = randomUUID()): DiagnosticUploadRecord 
       kind: 'deep-debug',
       explicitConsent: true,
       appVersion: '1.0.111',
+      osVersion: 'Microsoft Windows NT 10.0.19045.6456',
     },
     status: 'Uploading',
     createdAt: now,

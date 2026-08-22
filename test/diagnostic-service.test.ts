@@ -78,6 +78,7 @@ function request(sizeBytes = 1024) {
     kind: 'deep-debug' as const,
     explicitConsent: true as const,
     appVersion: '1.0.111',
+    osVersion: 'Microsoft Windows NT 10.0.19045.6456',
   };
 }
 

@@ -566,6 +566,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
         kind: 'deep-debug',
         explicitConsent: true,
         appVersion: '1.0.115',
+        osVersion: 'Microsoft Windows NT 10.0.19045.6456',
       },
     });
     assert.equal(create.statusCode, 201);
