@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="__CSRF_TOKEN__" />
     <title>Diagnostics · LilacMacro Control Desk</title>
     <link rel="stylesheet" href="/admin/assets/site.css" />
+    <link rel="stylesheet" href="/admin/assets/admin-diagnostics.css" />
   </head>
   <body class="admin-body">
     <header class="masthead admin-masthead">
@@ -26,11 +27,20 @@
           <div class="eyebrow">PRIVATE SUPPORT DATA</div>
           <h1>Diagnostics</h1>
           <p>
-            Archives are verified only when you request a download. Review or delete them before
+            Verified archives download directly from private storage. Review or delete them before
             expiry.
           </p>
         </div>
-        <button class="button small" id="refresh-diagnostics" type="button">Refresh</button>
+        <div class="diagnostic-heading-actions">
+          <label class="diagnostic-setting">
+            <input id="preverify-logs" type="checkbox" />
+            <span
+              ><strong>Pre-verify new logs</strong
+              ><small>Verify uploads before they are requested.</small></span
+            >
+          </label>
+          <button class="button small" id="refresh-diagnostics" type="button">Refresh</button>
+        </div>
       </section>
       <div id="notice" class="notice" role="status" hidden></div>
       <section class="admin-grid single-purpose">
@@ -109,5 +119,6 @@
       </form>
     </dialog>
     <script src="/admin/assets/admin.js" defer></script>
+    <script src="/admin/assets/admin-diagnostics.js" defer></script>
   </body>
 </html>

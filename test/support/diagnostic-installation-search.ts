@@ -3,12 +3,43 @@ import type { FastifyInstance } from 'fastify';
 
 const matchingInstallationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-export async function assertDiagnosticInstallationSearch(
+export async function assertDiagnosticAdministration(
   app: FastifyInstance,
   cookie: string,
   csrf: string,
   expectedUploadId: string,
 ): Promise<void> {
+  const settings = await app.inject({
+    method: 'GET',
+    url: '/admin/api/diagnostics/settings',
+    headers: { cookie },
+  });
+  assert.deepEqual(settings.json(), { preverifyLogs: true });
+  assert.equal(
+    (
+      await app.inject({
+        method: 'POST',
+        url: '/admin/api/diagnostics/settings',
+        headers: { cookie },
+        payload: { preverifyLogs: false },
+      })
+    ).statusCode,
+    403,
+  );
+  const changed = await app.inject({
+    method: 'POST',
+    url: '/admin/api/diagnostics/settings',
+    headers: { cookie, 'x-csrf-token': csrf },
+    payload: { preverifyLogs: false },
+  });
+  assert.deepEqual(changed.json(), { preverifyLogs: false });
+  await app.inject({
+    method: 'POST',
+    url: '/admin/api/diagnostics/settings',
+    headers: { cookie, 'x-csrf-token': csrf },
+    payload: { preverifyLogs: true },
+  });
+
   const withoutCsrf = await app.inject({
     method: 'POST',
     url: '/admin/api/diagnostics/search',

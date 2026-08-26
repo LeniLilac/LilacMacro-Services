@@ -300,6 +300,27 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
     }));
   }
 
+  public async readPreverificationEnabled(): Promise<boolean> {
+    const result = await this.pool.query<{ preverify_new_uploads: boolean }>(
+      'SELECT preverify_new_uploads FROM diagnostic_settings WHERE singleton = true',
+    );
+    if (result.rowCount !== 1) throw new Error('Diagnostic verification settings are unavailable.');
+    return result.rows[0]!.preverify_new_uploads;
+  }
+
+  public async setPreverificationEnabled(
+    enabled: boolean,
+    actor: Actor,
+    now: Date,
+  ): Promise<boolean> {
+    if (actor.kind !== 'web') throw new Error('Diagnostic settings require a web administrator.');
+    const result = await this.pool.query<{ changed: boolean }>(
+      'SELECT diagnostic_preverification_set($1,$2,$3) AS changed',
+      [enabled, actor.userId, now],
+    );
+    return result.rows[0]?.changed === true;
+  }
+
   public async scheduleDeletionRetry(
     id: string,
     nextAttemptAt: Date,
@@ -330,6 +351,7 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
     now: Date,
     staleBefore: Date,
     limit: number,
+    includeStored: boolean,
   ): Promise<DiagnosticUploadRecord[]> {
     const client = await this.pool.connect();
     try {
@@ -337,17 +359,18 @@ export class PostgresDiagnosticRepository implements DiagnosticRepository {
       const result = await client.query(
         `WITH claimed AS (
            SELECT id FROM diagnostic_uploads
-           WHERE (status = 'Verifying' AND
+           WHERE ($4 AND status = 'Pending' AND acceptance_deadline IS NULL)
+              OR (status = 'Verifying' AND
                     (next_verification_attempt_at IS NULL OR next_verification_attempt_at <= $1))
               OR (status = 'VerifyingActive' AND updated_at <= $2)
-           ORDER BY updated_at ASC
+           ORDER BY CASE WHEN status = 'Pending' THEN 1 ELSE 0 END, updated_at ASC
            FOR UPDATE SKIP LOCKED LIMIT $3
          )
          UPDATE diagnostic_uploads AS uploads
          SET status = 'VerifyingActive', updated_at = $1
          FROM claimed WHERE uploads.id = claimed.id
          RETURNING uploads.*`,
-        [now, staleBefore, limit],
+        [now, staleBefore, limit, includeStored],
       );
       await client.query('COMMIT');
       return result.rows.map(mapDiagnostic);

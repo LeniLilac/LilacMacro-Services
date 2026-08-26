@@ -78,6 +78,21 @@ test('Postgres control repository publishes exact idempotent commands and immuta
 test('Postgres diagnostic repository enforces quotas, bound parts, audit, and retry claims', async () => {
   const repository = new PostgresDiagnosticRepository(pool);
   const now = new Date('2026-08-14T13:00:00.000Z');
+  assert.equal(await repository.readPreverificationEnabled(), true);
+  assert.equal(
+    await repository.setPreverificationEnabled(false, { kind: 'web', userId: '123' }, now),
+    true,
+  );
+  assert.equal(await repository.readPreverificationEnabled(), false);
+  assert.equal(
+    await repository.setPreverificationEnabled(false, { kind: 'web', userId: '123' }, now),
+    false,
+  );
+  assert.equal(
+    Number((await pool.query('SELECT count(*) FROM diagnostic_settings_audit')).rows[0]?.count),
+    1,
+  );
+  await repository.setPreverificationEnabled(true, { kind: 'web', userId: '123' }, now);
   const record = diagnosticRecord(now);
   const limits = {
     installDailyBytes: 2_000,
@@ -327,6 +342,29 @@ test('Postgres runtime roles enforce the control and diagnostic authority split'
     await assert.rejects(api.query('DELETE FROM shared_configurations'));
     await assert.rejects(api.query('UPDATE control_state SET updated_at = updated_at'));
     await assert.rejects(api.query('INSERT INTO control_commands DEFAULT VALUES'));
+    assert.equal(
+      (await api.query('SELECT preverify_new_uploads FROM diagnostic_settings')).rowCount,
+      1,
+    );
+    assert.equal(
+      (
+        await api.query<{ changed: boolean }>(
+          'SELECT diagnostic_preverification_set(false,$1,now()) AS changed',
+          ['456'],
+        )
+      ).rows[0]?.changed,
+      true,
+    );
+    await assert.rejects(api.query('UPDATE diagnostic_settings SET preverify_new_uploads = true'));
+    await assert.rejects(
+      api.query(
+        `INSERT INTO diagnostic_settings_audit
+           (preverify_new_uploads,actor_kind,actor_id,created_at)
+         VALUES (true,'web','456',now())`,
+      ),
+    );
+    await api.query('SELECT diagnostic_preverification_set(true,$1,now())', ['456']);
+    await assert.rejects(api.query('DELETE FROM diagnostic_settings'));
 
     assert.equal(
       (await control.query('UPDATE control_state SET updated_at = updated_at')).rowCount,
@@ -338,6 +376,13 @@ test('Postgres runtime roles enforce the control and diagnostic authority split'
     await assert.rejects(control.query('DELETE FROM control_commands'));
 
     assert.ok(((await worker.query('SELECT id FROM diagnostic_uploads')).rowCount ?? 0) >= 1);
+    assert.equal(
+      (await worker.query('SELECT preverify_new_uploads FROM diagnostic_settings')).rowCount,
+      1,
+    );
+    await assert.rejects(
+      worker.query('UPDATE diagnostic_settings SET preverify_new_uploads = false'),
+    );
     await assert.rejects(worker.query('SELECT * FROM diagnostic_large_upload_grants'));
     await assert.rejects(worker.query('SELECT revision FROM control_state'));
     await assert.rejects(worker.query('SELECT * FROM telemetry_events'));

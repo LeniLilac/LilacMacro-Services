@@ -225,7 +225,7 @@ async function downloadDiagnostic(record) {
         { method: 'POST' },
       );
       if (result.status === 'Accepted') {
-        location.assign(result.url);
+        Object.assign(document.createElement('a'), { href: result.url }).click();
         return;
       }
       if (!announced) {

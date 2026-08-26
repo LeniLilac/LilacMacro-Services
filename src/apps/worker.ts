@@ -19,22 +19,31 @@ process.once('SIGINT', () => controller.abort());
 process.once('SIGTERM', () => controller.abort());
 heartbeat.start();
 
-await Promise.all([diagnosticLoop(), controlLoop()]);
+await Promise.all([diagnosticVerificationLoop(), diagnosticMaintenanceLoop(), controlLoop()]);
 await heartbeat.stop();
 await services.pool.end();
 
-async function diagnosticLoop(): Promise<void> {
+async function diagnosticVerificationLoop(): Promise<void> {
   while (!controller.signal.aborted) {
     diagnosticActiveSince = Date.now();
-    let succeeded = true;
+    let verified = 0;
     try {
-      const verified = await services.diagnosticService.verifyPending(4, controller.signal);
+      const preverify = await services.diagnosticService.preverificationEnabled();
+      verified = await services.diagnosticService.verifyPending(8, controller.signal, preverify);
       if (verified) console.log(JSON.stringify({ event: 'diagnostic_verification', verified }));
     } catch (error) {
-      succeeded = false;
       logError('verification_worker_error', error);
+    } finally {
+      diagnosticActiveSince = 0;
     }
-    if (controller.signal.aborted) break;
+    await heartbeat.refresh();
+    await wait(verified === 8 ? 250 : 3_000);
+  }
+}
+
+async function diagnosticMaintenanceLoop(): Promise<void> {
+  while (!controller.signal.aborted) {
+    let succeeded = true;
     try {
       const removed = await services.diagnosticService.cleanup(100, controller.signal);
       if (removed) console.log(JSON.stringify({ event: 'diagnostic_cleanup', removed }));
@@ -77,7 +86,6 @@ async function diagnosticLoop(): Promise<void> {
       succeeded = false;
       logError('multipart_reconciliation_error', error);
     }
-    diagnosticActiveSince = 0;
     if (succeeded) lastMaintenanceSuccess = Date.now();
     await heartbeat.refresh();
     await wait(60_000);

@@ -35,6 +35,7 @@ const moderationSchema = z
     action: z.literal('delete'),
   })
   .strict();
+const diagnosticSettingsSchema = z.object({ preverifyLogs: z.boolean() }).strict();
 
 const pages = new Map([
   ['/admin', 'admin.html'],
@@ -68,6 +69,8 @@ export function registerAdminRoutes(
   for (const [route, file, contentType] of [
     ['/admin/assets/site.css', 'site.css', 'text/css'],
     ['/admin/assets/admin.js', 'admin.js', 'text/javascript'],
+    ['/admin/assets/admin-diagnostics.css', 'admin-diagnostics.css', 'text/css'],
+    ['/admin/assets/admin-diagnostics.js', 'admin-diagnostics.js', 'text/javascript'],
   ] as const) {
     app.get(route, async (request, reply) => {
       if (!(await authorizeAdmin(request, reply, authDependencies, false))) return;
@@ -124,6 +127,21 @@ function registerDiagnosticAdminRoutes(
         diagnosticListFilters(input, dependencies.pseudonymizer, dependencies.clock.now()),
       ),
     );
+  });
+  app.get('/admin/api/diagnostics/settings', async (request, reply) => {
+    if (!(await authorizeAdmin(request, reply, auth, false))) return;
+    return { preverifyLogs: await dependencies.diagnosticService.preverificationEnabled() };
+  });
+  app.post('/admin/api/diagnostics/settings', async (request, reply) => {
+    const actor = await authorizeAdmin(request, reply, auth, true);
+    if (!actor) return;
+    const input = diagnosticSettingsSchema.parse(request.body);
+    return {
+      preverifyLogs: await dependencies.diagnosticService.setPreverificationEnabled(
+        input.preverifyLogs,
+        { kind: 'web', userId: actor.userId },
+      ),
+    };
   });
   app.post('/admin/api/diagnostics/:id/moderate', async (request, reply) => {
     const actor = await authorizeAdmin(request, reply, auth, true);

@@ -1,0 +1,65 @@
+.diagnostic-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.diagnostic-setting {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 7px 11px;
+  border: 2px solid var(--ink);
+  background: var(--paper-2);
+  cursor: pointer;
+}
+
+.diagnostic-setting:focus-within {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.diagnostic-setting input {
+  width: 19px;
+  min-height: 19px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.diagnostic-setting span {
+  display: grid;
+  gap: 1px;
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: none;
+}
+
+.diagnostic-setting strong {
+  font-size: 13px;
+}
+
+.diagnostic-setting small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.diagnostic-setting:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+@media (max-width: 760px) {
+  .diagnostic-heading-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .diagnostic-setting {
+    justify-content: flex-start;
+  }
+}

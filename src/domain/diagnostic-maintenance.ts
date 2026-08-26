@@ -85,12 +85,17 @@ export class DiagnosticMaintenanceService {
     }
   }
 
-  public async verifyPending(limit = 4, signal?: AbortSignal): Promise<number> {
+  public async verifyPending(
+    limit = 4,
+    signal?: AbortSignal,
+    includeStored = false,
+  ): Promise<number> {
     const now = this.clock.now();
     const records = await this.repository.claimVerification(
       now,
       new Date(now.getTime() - 6 * 60 * 60 * 1000),
       Math.min(Math.max(limit, 1), 8),
+      includeStored,
     );
     await Promise.all(records.map((record) => this.verifyClaimed(record, signal)));
     return records.length;

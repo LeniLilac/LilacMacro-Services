@@ -113,6 +113,7 @@ function replayFingerprint(actor: Actor, envelope: AdminCommandEnvelope): string
 }
 
 export class MemoryDiagnosticRepository implements DiagnosticRepository {
+  private preverificationEnabled = true;
   private readonly records = new Map<string, DiagnosticUploadRecord>();
   private readonly capacityReleased = new Set<string>();
   public readonly audit: DiagnosticAuditRecord[] = [];
@@ -296,6 +297,16 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
       .map((record) => structuredClone(record));
   }
 
+  public async readPreverificationEnabled(): Promise<boolean> {
+    return this.preverificationEnabled;
+  }
+
+  public async setPreverificationEnabled(enabled: boolean): Promise<boolean> {
+    const changed = this.preverificationEnabled !== enabled;
+    this.preverificationEnabled = enabled;
+    return changed;
+  }
+
   public async scheduleDeletionRetry(
     id: string,
     nextAttemptAt: Date,
@@ -317,16 +328,21 @@ export class MemoryDiagnosticRepository implements DiagnosticRepository {
     now: Date,
     staleBefore: Date,
     limit: number,
+    includeStored: boolean,
   ): Promise<DiagnosticUploadRecord[]> {
     const claimed = [...this.records.values()]
       .filter(
         (record) =>
+          (includeStored && record.status === 'Pending' && record.acceptanceDeadline === null) ||
           (record.status === 'Verifying' &&
             (record.nextVerificationAttemptAt === null ||
               record.nextVerificationAttemptAt <= now)) ||
           (record.status === 'VerifyingActive' && record.updatedAt <= staleBefore),
       )
-      .sort((left, right) => left.updatedAt.getTime() - right.updatedAt.getTime())
+      .sort((left, right) => {
+        const priority = Number(left.status === 'Pending') - Number(right.status === 'Pending');
+        return priority || left.updatedAt.getTime() - right.updatedAt.getTime();
+      })
       .slice(0, limit);
     for (const record of claimed) {
       record.status = 'VerifyingActive';

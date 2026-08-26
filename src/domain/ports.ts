@@ -132,12 +132,19 @@ export interface DiagnosticRepository {
   ): Promise<boolean>;
   appendAudit(id: string, event: DiagnosticAuditEvent): Promise<void>;
   listAudit(uploadId: string | null, limit: number): Promise<DiagnosticAuditRecord[]>;
+  readPreverificationEnabled(): Promise<boolean>;
+  setPreverificationEnabled(enabled: boolean, actor: Actor, now: Date): Promise<boolean>;
   scheduleDeletionRetry(
     id: string,
     nextAttemptAt: Date,
     audit: DiagnosticAuditEvent,
   ): Promise<boolean>;
-  claimVerification(now: Date, staleBefore: Date, limit: number): Promise<DiagnosticUploadRecord[]>;
+  claimVerification(
+    now: Date,
+    staleBefore: Date,
+    limit: number,
+    includeStored: boolean,
+  ): Promise<DiagnosticUploadRecord[]>;
   scheduleVerificationRetry(id: string, nextAttemptAt: Date): Promise<boolean>;
   claimExpired(now: Date, limit: number): Promise<DiagnosticUploadRecord[]>;
   listProviderUploadIds(): Promise<readonly string[]>;

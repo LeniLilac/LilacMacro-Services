@@ -295,6 +295,15 @@ export class DiagnosticService {
     return this.repository.listAudit(uploadId, Math.min(Math.max(limit, 1), 250));
   }
 
+  public preverificationEnabled(): Promise<boolean> {
+    return this.repository.readPreverificationEnabled();
+  }
+
+  public async setPreverificationEnabled(enabled: boolean, actor: Actor): Promise<boolean> {
+    await this.repository.setPreverificationEnabled(enabled, actor, this.clock.now());
+    return this.repository.readPreverificationEnabled();
+  }
+
   public async downloadUrl(id: string, actor: Actor): Promise<string> {
     const result = await this.requestDownload(id, actor);
     if (result.status !== 'Accepted') throw new Error('Diagnostic upload is still verifying.');
@@ -346,8 +355,12 @@ export class DiagnosticService {
     return this.maintenance.cleanup(limit, signal);
   }
 
-  public async verifyPending(limit = 4, signal?: AbortSignal): Promise<number> {
-    return this.maintenance.verifyPending(limit, signal);
+  public async verifyPending(
+    limit = 4,
+    signal?: AbortSignal,
+    includeStored = false,
+  ): Promise<number> {
+    return this.maintenance.verifyPending(limit, signal, includeStored);
   }
 
   public async reconcileMultipartOrphans(limit = 100, signal?: AbortSignal): Promise<number> {

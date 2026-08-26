@@ -139,6 +139,22 @@ test('routine upload is stored until download requests verification', async () =
   assert.ok(repository.audit.some((event) => event.action === 'download.requested'));
 });
 
+test('pre-verification defaults on, remains optional, and accepts stored uploads concurrently', async () => {
+  const { service, repository, storage } = fixture();
+  storage.expectedSize = 1024;
+  assert.equal(await service.preverificationEnabled(), true);
+  assert.equal(
+    await service.setPreverificationEnabled(false, { kind: 'web', userId: '123' }),
+    false,
+  );
+  const grant = await service.create(identity, request());
+  await completeOnePart(service, grant, 1024);
+  assert.equal(await service.verifyPending(8, undefined, false), 0);
+  assert.equal(await service.setPreverificationEnabled(true, { kind: 'web', userId: '123' }), true);
+  assert.equal(await service.verifyPending(8, undefined, true), 1);
+  assert.equal((await repository.find(grant.id))?.status, 'Accepted');
+});
+
 test('the single archive limit accepts exactly 3 GiB and rejects anything larger', async () => {
   const { service, repository, storage } = fixture();
   const size = 3 * oneGiB;

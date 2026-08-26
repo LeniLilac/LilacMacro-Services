@@ -83,21 +83,24 @@ Keep process-specific environment blocks separate when adding a credential. A se
 
 The worker runs every minute and:
 
-1. claims only stored uploads whose Download action requested verification, then streams each object to verify its exact byte count and SHA-256;
+1. reads the administrator pre-verification setting, prioritizes explicit Download requests, and claims up to eight archives for concurrent exact byte-count and SHA-256 verification;
 2. retries transient verification failures with bounded backoff and deletes permanent mismatches;
 3. aborts multipart sessions older than 12 hours;
-4. deletes untouched stored uploads at their normal expiry and any legacy Pending uploads left from the retired grant workflow;
+4. deletes untouched stored uploads at their normal expiry when pre-verification is disabled and any legacy Pending uploads left from the retired grant workflow;
 5. deletes rejected/expired objects and tombstones metadata;
 6. lists incomplete multipart uploads under the exact service prefix and aborts provider uploads older than 12 hours that are absent from repository state;
 7. enforces the configured storage-time budget and per-install/IP quotas.
 
 All new automatic diagnostic archives use the same 3 GiB maximum and expire 72 hours after upload.
-The control desk exposes review, on-demand verified download, and deletion only; it cannot issue
-upload grants, accept archives, or extend retention. Clicking Download atomically queues verification,
-shows its progress, and automatically starts the download after acceptance. Repeated clicks and UI
-polls do not queue duplicate verification work. Archives that are never requested are never streamed
-through the service and are deleted at normal expiry. The legacy grant tables remain inert during the
-rollback-compatibility window, and the worker continues deleting any pre-removal Pending records.
+The control desk exposes review, a default-on `Pre-verify new logs` setting, verified download, and
+deletion only; it cannot issue upload grants, accept archives, or extend retention. With pre-verification
+enabled, the worker prepares new archives before they are requested. With it disabled, clicking Download
+atomically queues verification. The browser shows progress and starts a direct Backblaze download after
+acceptance. Repeated clicks and UI polls do not queue duplicate work. The worker checks for queued work
+about every three seconds, verifies up to eight archives concurrently, and gives explicit requests priority
+over background archives. Each accepted row starts an independent direct-storage transfer, so multiple
+downloads can remain active concurrently. The legacy grant tables remain inert during the rollback-compatibility window,
+and the worker continues deleting any pre-removal Pending records.
 
 The Diagnostics page displays current-client application version, complete Windows version, and a
 short rotating installation reference without opening an archive. Searches can combine a minimum

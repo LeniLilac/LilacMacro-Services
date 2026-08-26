@@ -20,7 +20,7 @@ import { Ed25519SnapshotSigner } from '../src/infrastructure/snapshot-signer.js'
 import { hashSessionToken, issueCsrfToken } from '../src/infrastructure/session-codec.js';
 import { HmacUploadAuthorizer } from '../src/infrastructure/upload-authorizer.js';
 import { startTemporaryPostgres } from './helpers/postgres.js';
-import { assertDiagnosticInstallationSearch } from './support/diagnostic-installation-search.js';
+import { assertDiagnosticAdministration } from './support/diagnostic-installation-search.js';
 import {
   assertBrowserAudit,
   assertFullAccessAudit,
@@ -394,7 +394,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     });
     assert.equal(diagnosticsPage.statusCode, 200);
     assert.doesNotMatch(diagnosticsPage.body, /large-upload|Large-file grant/i);
-    assert.match(diagnosticsPage.body, /verified only when you request a download/);
+    assert.match(diagnosticsPage.body, /Pre-verify new logs/);
     assert.match(diagnosticsPage.body, /\/admin\/assets\/admin\.js/);
     assert.match(diagnosticsPage.body, /\/admin\/assets\/site\.css/);
     const [adminScript, siteStyles] = await Promise.all([
@@ -601,7 +601,7 @@ test('API boundary enforces admin authorization, CSRF, signed control, and uploa
     assert.equal(diagnostics.statusCode, 200);
     assert.equal(diagnostics.json()[0].status, 'Stored');
     assert.equal(diagnostics.json()[0].verificationActive, false);
-    await assertDiagnosticInstallationSearch(app, cookie, csrf, grant.id);
+    await assertDiagnosticAdministration(app, cookie, csrf, grant.id);
     await assertFullAccessDiagnosticMetadata(app, fullApiToken, grant.id);
     const downloadPath = `/admin/api/diagnostics/${grant.id}/download`;
     assert.equal(
