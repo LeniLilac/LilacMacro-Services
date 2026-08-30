@@ -4,7 +4,7 @@ param(
     [int]$Hours = 6,
 
     [ValidateRange(1, 3072)]
-    [int]$MaxArchiveMiB = 50,
+    [int]$MaxArchiveMiB = 3072,
 
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$MinimumAppVersion = '',
@@ -196,23 +196,27 @@ function Expand-TextEvidence {
 }
 
 function Get-FailureFindings {
-    $patterns = @(
-        '(?i)\b(error|exception|failed|failure|fatal|crash(?:ed)?)\b',
-        '(?i)recoverable anomaly',
-        '(?i)access (?:to the path )?is denied',
-        '(?i)no capturable area',
-        '(?i)not responding',
-        '(?i)timed? out|timeout',
-        '(?i)(?:placement setup|selection ui|roblox lobby) (?:was )?not found'
+    $failurePattern = [regex]::new(
+        '(?:\b(?:error|exception|failed|failure|fatal|crash(?:ed)?)\b|recoverable anomaly|access (?:to the path )?is denied|no capturable area|not responding|timed? out|timeout|(?:placement setup|selection ui|roblox lobby) (?:was )?not found)',
+        [Text.RegularExpressions.RegexOptions]::IgnoreCase -bor
+        [Text.RegularExpressions.RegexOptions]::CultureInvariant -bor
+        [Text.RegularExpressions.RegexOptions]::Compiled
     )
     $findings = [Collections.Generic.List[object]]::new()
     foreach ($file in Get-ChildItem -LiteralPath $evidenceRoot -Recurse -File) {
+        $relative = [IO.Path]::GetRelativePath($evidenceRoot, $file.FullName)
+        $parts = $relative.Split([IO.Path]::DirectorySeparatorChar, 2)
+        $diagnosticId = $parts[0]
+        $member = if ($parts.Length -eq 2) { $parts[1] } else { $file.Name }
+        if ($member -eq "frames$([IO.Path]::DirectorySeparatorChar)index.json") {
+            continue
+        }
         $reader = [IO.File]::OpenText($file.FullName)
         try {
             $lineNumber = 0
             while (($line = $reader.ReadLine()) -ne $null) {
                 $lineNumber++
-                if (-not ($patterns | Where-Object { $line -match $_ } | Select-Object -First 1)) {
+                if (-not $failurePattern.IsMatch($line)) {
                     continue
                 }
                 $sample = if ($line.Length -le 600) { $line } else { $line.Substring(0, 600) }
@@ -220,8 +224,8 @@ function Get-FailureFindings {
                 $signature = $signature -replace '\b[0-9A-F]{8}-[0-9A-F-]{27,}\b', '<GUID>'
                 $signature = $signature -replace '\b\d+(?:\.\d+)?\b', '<N>'
                 $findings.Add([pscustomobject]@{
-                    DiagnosticId = $file.Directory.Name
-                    Member = [IO.Path]::GetRelativePath((Join-Path $evidenceRoot $file.Directory.Name), $file.FullName)
+                    DiagnosticId = $diagnosticId
+                    Member = $member
                     Line = $lineNumber
                     Signature = $signature
                     Sample = $sample
