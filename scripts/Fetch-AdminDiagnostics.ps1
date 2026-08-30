@@ -203,38 +203,30 @@ function Get-FailureFindings {
         [Text.RegularExpressions.RegexOptions]::Compiled
     )
     $findings = [Collections.Generic.List[object]]::new()
-    foreach ($file in Get-ChildItem -LiteralPath $evidenceRoot -Recurse -File) {
-        $relative = [IO.Path]::GetRelativePath($evidenceRoot, $file.FullName)
+    $files = @(
+        Get-ChildItem -LiteralPath $evidenceRoot -Recurse -File |
+            Where-Object {
+                -not [IO.Path]::GetRelativePath($evidenceRoot, $_.FullName).EndsWith(
+                    "$([IO.Path]::DirectorySeparatorChar)frames$([IO.Path]::DirectorySeparatorChar)index.json",
+                    [StringComparison]::OrdinalIgnoreCase)
+            }
+    )
+    foreach ($match in $files | Select-String -Pattern $failurePattern) {
+        $relative = [IO.Path]::GetRelativePath($evidenceRoot, $match.Path)
         $parts = $relative.Split([IO.Path]::DirectorySeparatorChar, 2)
         $diagnosticId = $parts[0]
-        $member = if ($parts.Length -eq 2) { $parts[1] } else { $file.Name }
-        if ($member -eq "frames$([IO.Path]::DirectorySeparatorChar)index.json") {
-            continue
-        }
-        $reader = [IO.File]::OpenText($file.FullName)
-        try {
-            $lineNumber = 0
-            while (($line = $reader.ReadLine()) -ne $null) {
-                $lineNumber++
-                if (-not $failurePattern.IsMatch($line)) {
-                    continue
-                }
-                $sample = if ($line.Length -le 600) { $line } else { $line.Substring(0, 600) }
-                $signature = $sample.ToUpperInvariant()
-                $signature = $signature -replace '\b[0-9A-F]{8}-[0-9A-F-]{27,}\b', '<GUID>'
-                $signature = $signature -replace '\b\d+(?:\.\d+)?\b', '<N>'
-                $findings.Add([pscustomobject]@{
-                    DiagnosticId = $diagnosticId
-                    Member = $member
-                    Line = $lineNumber
-                    Signature = $signature
-                    Sample = $sample
-                })
-            }
-        }
-        finally {
-            $reader.Dispose()
-        }
+        $member = if ($parts.Length -eq 2) { $parts[1] } else { [IO.Path]::GetFileName($match.Path) }
+        $sample = if ($match.Line.Length -le 600) { $match.Line } else { $match.Line.Substring(0, 600) }
+        $signature = $sample.ToUpperInvariant()
+        $signature = $signature -replace '\b[0-9A-F]{8}-[0-9A-F-]{27,}\b', '<GUID>'
+        $signature = $signature -replace '\b\d+(?:\.\d+)?\b', '<N>'
+        $findings.Add([pscustomobject]@{
+            DiagnosticId = $diagnosticId
+            Member = $member
+            Line = $match.LineNumber
+            Signature = $signature
+            Sample = $sample
+        })
     }
     return $findings
 }
